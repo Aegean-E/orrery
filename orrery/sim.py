@@ -1,0 +1,229 @@
+"""Gravity, bodies and a symplectic leapfrog integrator.
+
+Everything here is unit-agnostic. A :class:`World` needs a gravitational constant and a set of
+bodies; the scenarios choose units. The integrator is kick-drift-kick leapfrog, which is
+time-reversible and keeps orbital energy bounded instead of drifting secularly.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+import math
+from typing import Sequence
+
+
+@dataclass(frozen=True, slots=True)
+class Vec2:
+    """A point or vector in the plane."""
+
+    x: float = 0.0
+    y: float = 0.0
+
+    def __add__(self, other: "Vec2") -> "Vec2":
+        return Vec2(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other: "Vec2") -> "Vec2":
+        return Vec2(self.x - other.x, self.y - other.y)
+
+    def __mul__(self, scalar: float) -> "Vec2":
+        return Vec2(self.x * scalar, self.y * scalar)
+
+    def __rmul__(self, scalar: float) -> "Vec2":
+        return self * scalar
+
+    def __truediv__(self, scalar: float) -> "Vec2":
+        return Vec2(self.x / scalar, self.y / scalar)
+
+    def __neg__(self) -> "Vec2":
+        return Vec2(-self.x, -self.y)
+
+    def dot(self, other: "Vec2") -> float:
+        return self.x * other.x + self.y * other.y
+
+    def norm_sq(self) -> float:
+        return self.x * self.x + self.y * self.y
+
+    def norm(self) -> float:
+        return math.hypot(self.x, self.y)
+
+    def distance_to(self, other: "Vec2") -> float:
+        return math.hypot(self.x - other.x, self.y - other.y)
+
+
+@dataclass(frozen=True, slots=True)
+class Body:
+    """An immutable snapshot of one gravitating body."""
+
+    name: str
+    mass: float
+    pos: Vec2
+    vel: Vec2
+    symbol: str = "o"
+    color: str = "white"
+
+
+@dataclass(frozen=True, slots=True)
+class Orbit:
+    """Osculating elements of one body around a chosen primary, in world units."""
+
+    semi_major: float | None
+    eccentricity: float | None
+    period: float | None
+
+
+def _accelerations(bodies: Sequence[Body], g: float) -> tuple[Vec2, ...]:
+    """Pairwise Newtonian acceleration on every body."""
+    count = len(bodies)
+    ax = [0.0] * count
+    ay = [0.0] * count
+    for i in range(count - 1):
+        first = bodies[i]
+        for j in range(i + 1, count):
+            second = bodies[j]
+            dx = second.pos.x - first.pos.x
+            dy = second.pos.y - first.pos.y
+            r2 = dx * dx + dy * dy
+            if r2 <= 0.0:
+                continue
+            inverse_r3 = 1.0 / (r2 * math.sqrt(r2))
+            pull = g * inverse_r3
+            ax[i] += pull * second.mass * dx
+            ay[i] += pull * second.mass * dy
+            ax[j] -= pull * first.mass * dx
+            ay[j] -= pull * first.mass * dy
+    return tuple(Vec2(ax[i], ay[i]) for i in range(count))
+
+
+@dataclass(slots=True)
+class World:
+    """A mutable simulation clock over a tuple of immutable bodies."""
+
+    bodies: tuple[Body, ...]
+    g: float
+    time: float = 0.0
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.g) or self.g <= 0.0:
+            raise ValueError("the gravitational constant must be a positive finite number")
+        if not self.bodies:
+            raise ValueError("a world needs at least one body")
+        names = set()
+        for body in self.bodies:
+            if not math.isfinite(body.mass) or body.mass <= 0.0:
+                raise ValueError(f"body '{body.name}' must have a positive finite mass")
+            if not all(math.isfinite(value) for value in
+                       (body.pos.x, body.pos.y, body.vel.x, body.vel.y)):
+                raise ValueError(f"body '{body.name}' has a non-finite state")
+            if body.name in names:
+                raise ValueError(f"duplicate body name '{body.name}'")
+            names.add(body.name)
+        if not math.isfinite(self.time):
+            raise ValueError("time must be finite")
+
+    def accelerations(self) -> tuple[Vec2, ...]:
+        return _accelerations(self.bodies, self.g)
+
+    def step(self, dt: float) -> None:
+        """Advance one kick-drift-kick leapfrog step of length ``dt``."""
+        if not math.isfinite(dt) or dt <= 0.0:
+            raise ValueError("the time step must be a positive finite number")
+        half = dt * 0.5
+        start = _accelerations(self.bodies, self.g)
+        drifted = tuple(
+            replace(
+                body,
+                pos=Vec2(
+                    body.pos.x + (body.vel.x + acc.x * half) * dt,
+                    body.pos.y + (body.vel.y + acc.y * half) * dt,
+                ),
+                vel=Vec2(body.vel.x + acc.x * half, body.vel.y + acc.y * half),
+            )
+            for body, acc in zip(self.bodies, start)
+        )
+        end = _accelerations(drifted, self.g)
+        self.bodies = tuple(
+            replace(body, vel=Vec2(body.vel.x + acc.x * half, body.vel.y + acc.y * half))
+            for body, acc in zip(drifted, end)
+        )
+        self.time += dt
+
+    def advance(self, dt: float, steps: int) -> None:
+        if steps < 0:
+            raise ValueError("steps cannot be negative")
+        for _ in range(steps):
+            self.step(dt)
+
+    def advance_to(self, target: float, dt: float) -> None:
+        """Integrate to ``target``, ending with a shorter step when needed."""
+        if not math.isfinite(target):
+            raise ValueError("the target time must be finite")
+        if target < self.time - 1e-12:
+            raise ValueError("cannot travel backwards in time")
+        while self.time < target - 1e-12:
+            remaining = target - self.time
+            self.step(dt if remaining > dt else remaining)
+
+    @property
+    def total_mass(self) -> float:
+        return math.fsum(body.mass for body in self.bodies)
+
+    def momentum(self) -> Vec2:
+        return Vec2(
+            math.fsum(body.mass * body.vel.x for body in self.bodies),
+            math.fsum(body.mass * body.vel.y for body in self.bodies),
+        )
+
+    def center_of_mass(self) -> Vec2:
+        total = self.total_mass
+        return Vec2(
+            math.fsum(body.mass * body.pos.x for body in self.bodies) / total,
+            math.fsum(body.mass * body.pos.y for body in self.bodies) / total,
+        )
+
+    def kinetic_energy(self) -> float:
+        return math.fsum(0.5 * body.mass * body.vel.norm_sq() for body in self.bodies)
+
+    def potential_energy(self) -> float:
+        total = 0.0
+        for i in range(len(self.bodies) - 1):
+            for j in range(i + 1, len(self.bodies)):
+                separation = self.bodies[i].pos.distance_to(self.bodies[j].pos)
+                if separation > 0.0:
+                    total -= self.g * self.bodies[i].mass * self.bodies[j].mass / separation
+        return total
+
+    def total_energy(self) -> float:
+        return self.kinetic_energy() + self.potential_energy()
+
+    def angular_momentum(self) -> float:
+        return math.fsum(
+            body.mass * (body.pos.x * body.vel.y - body.pos.y * body.vel.x)
+            for body in self.bodies
+        )
+
+    def energy_drift(self, initial_energy: float) -> float:
+        if initial_energy == 0.0:
+            return 0.0
+        return (self.total_energy() - initial_energy) / abs(initial_energy)
+
+
+def orbital_elements(primary: Body, body: Body, g: float) -> Orbit:
+    """Osculating semi-major axis, eccentricity and period of ``body`` around ``primary``."""
+    relative_position = body.pos - primary.pos
+    relative_velocity = body.vel - primary.vel
+    radius = relative_position.norm()
+    mu = g * (primary.mass + body.mass)
+    if radius <= 0.0 or mu <= 0.0:
+        return Orbit(None, None, None)
+    speed_sq = relative_velocity.norm_sq()
+    specific_energy = 0.5 * speed_sq - mu / radius
+    semi_major = -mu / (2.0 * specific_energy) if specific_energy < 0.0 else None
+    eccentricity_vector = (
+        relative_position * (speed_sq / mu - 1.0 / radius)
+        - relative_velocity * (relative_position.dot(relative_velocity) / mu)
+    )
+    eccentricity = eccentricity_vector.norm()
+    period = None
+    if semi_major is not None and semi_major > 0.0:
+        period = 2.0 * math.pi * math.sqrt(semi_major**3 / mu)
+    return Orbit(semi_major, eccentricity, period)

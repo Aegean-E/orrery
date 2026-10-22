@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orrery-cli"
+version = "1.0.0"
+description = "A zero-dependency N-body orbital sandbox for the terminal"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "AI Assistant" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+orrery = "orrery.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["orrery*"]
