@@ -88,7 +88,7 @@
 ### [`orrery/scenarios.py`](orrery/scenarios.py)
 > *The built-in worlds.*
 
-**Size**: `299` lines (`10687` bytes)
+**Size**: `299` lines (`10740` bytes)
 
 **Classes:**
 - `class Scenario` - *A named initial state plus the knobs the player needs to present it.*
