@@ -36,9 +36,9 @@ class TriadParser(argparse.ArgumentParser):
     """Argparse that turns a usage error into the Error/Why/Fix triad."""
 
     def error(self, message: str) -> None:
-        """Print usage and a triad, then exit 2 like any other usage failure."""
+        """Print usage and the Error/Why/Fix triad, then exit 2."""
         self.print_usage(sys.stderr)
-        self.exit(2, f"{self.prog}: error: {message}\n"
+        self.exit(2, f"Error: {message}\n"
                      "Why: the command needs a known subcommand and valid options.\n"
                      "Fix: run `python -m orrery --help`, then retry with one of its "
                      "listed commands.\n")

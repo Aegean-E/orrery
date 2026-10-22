@@ -6,13 +6,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BATCH = ROOT / "run.cmd"
 SHELL = ROOT / "run.sh"
+COMMAND = ROOT / "run.command"
 
 
 class LauncherTest(unittest.TestCase):
 
     def test_launchers_exist(self):
-        for path in (BATCH, SHELL):
+        for path in (BATCH, SHELL, COMMAND):
             self.assertTrue(path.is_file(), path.name)
+
+    def test_macos_command_launcher_delegates_to_the_shell_launcher(self):
+        text = COMMAND.read_text(encoding="utf-8")
+        self.assertIn("run.sh", text)
+        self.assertIn("read -r _", text)
 
     def test_batch_file_has_crlf_line_endings(self):
         data = BATCH.read_bytes()

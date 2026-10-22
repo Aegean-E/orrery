@@ -55,11 +55,14 @@ to ASCII borders and trail dots automatically; pass `--ascii` to force it.
 
 - **Windows**: double-click `run.cmd` to open the solar-system animation. It keeps the window
   open when the run ends.
-- **macOS / Linux**: run `./run.sh` (or `sh run.sh`) for the same animation.
+- **macOS**: double-click `run.command`; it opens Terminal, runs the same animation, and waits
+  for Return so the final frame stays visible.
+- **Linux**: run `./run.sh` (or `sh run.sh`) for the same animation.
 - To start a different world, pass its key and any normal `run` options:
   ```text
   run.cmd figure-eight
   run.cmd trojans --fps 30
+  ./run.command binary --frames 120
   ./run.sh binary --frames 120
   ```
 
@@ -144,7 +147,8 @@ orrery/
 ├── README.md
 ├── pyproject.toml            <- package metadata and the `orrery` console script
 ├── run.cmd                   <- one-click Windows launcher (solar by default)
-├── run.sh                    <- one-click macOS/Linux launcher
+├── run.command               <- one-click macOS launcher, delegates to run.sh
+├── run.sh                    <- one-click Linux/POSIX launcher
 ├── orrery/
 │   ├── __init__.py
 │   ├── __main__.py           <- `python -m orrery`
@@ -165,7 +169,7 @@ orrery/
 
 ## 🧪 Verification
 
-The suite is 45 tests and completes in about 0.2 seconds:
+The suite is 46 tests and completes in about 0.2 seconds:
 
 ```bash
 python -m unittest discover -s tests -t .
@@ -174,7 +178,8 @@ python -m unittest discover -s tests -t .
 It covers pairwise gravity, circular-orbit energy and radius, momentum and barycentre
 conservation over 500 steps, the full figure-eight period, orbital-element recovery for Earth,
 Trojan geometry, viewport aspect correction, ASCII and colour rendering, trail bounds and
-sampling, every CLI command, CSV shape, and the `Error/Why/Fix` failure paths.
+sampling, every CLI command, CSV shape, the launcher files, and the `Error/Why/Fix` failure
+paths.
 
 ## 📚 Design Notes
 

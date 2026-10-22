@@ -9,8 +9,8 @@
 - **Total Python Modules**: `14`
 - **Total Classes**: `20`
 - **Total Top-Level Functions**: `36`
-- **Total Class Methods**: `82`
-- **Total Source Lines**: `1693`
+- **Total Class Methods**: `83`
+- **Total Source Lines**: `1700`
 
 ---
 
@@ -33,13 +33,13 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `532` lines (`21035` bytes)
+**Size**: `532` lines (`21009` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
   - Method `.__init__(message, why, fix, code)`
 - `class TriadParser` - *Argparse that turns a usage error into the Error/Why/Fix triad.*
-  - Method `.error(message)` - *Print usage and a triad, then exit 2 like any other usage failure.*
+  - Method `.error(message)` - *Print usage and the Error/Why/Fix triad, then exit 2.*
 
 **Functions:**
 - `def _scenario(name)`
@@ -168,7 +168,7 @@
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `134` lines (`5463` bytes)
+**Size**: `135` lines (`5514` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -197,11 +197,12 @@
 ### [`tests/test_launchers.py`](tests/test_launchers.py)
 > *One-click launch files: present, CRLF-safe on Windows and Python 3.10-aware.*
 
-**Size**: `34` lines (`1093` bytes)
+**Size**: `40` lines (`1339` bytes)
 
 **Classes:**
 - `class LauncherTest`
   - Method `.test_launchers_exist()`
+  - Method `.test_macos_command_launcher_delegates_to_the_shell_launcher()`
   - Method `.test_batch_file_has_crlf_line_endings()`
   - Method `.test_launchers_check_python_310_and_start_the_module()`
   - Method `.test_batch_failure_stays_visible()`

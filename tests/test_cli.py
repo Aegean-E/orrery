@@ -55,6 +55,7 @@ class ListAndInfoTests(unittest.TestCase):
             with contextlib.redirect_stderr(stderr):
                 main(["--not-a-command"])
         self.assertEqual(2, caught.exception.code)
+        self.assertIn("Error:", stderr.getvalue())
         self.assertIn("Why:", stderr.getvalue())
         self.assertIn("Fix:", stderr.getvalue())
 
