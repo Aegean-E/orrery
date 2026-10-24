@@ -11,12 +11,21 @@ from orrery.sim import World, orbital_elements
 
 
 class ScenarioTests(unittest.TestCase):
-    def test_exactly_five_distinct_scenarios(self):
+    def test_exactly_six_distinct_scenarios(self):
         self.assertEqual(
             scenario_keys(),
-            ("solar", "figure-eight", "binary", "trojans", "pythagorean"),
+            ("solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange"),
         )
-        self.assertEqual(len(set(scenario_keys())), 5)
+        self.assertEqual(len(set(scenario_keys())), 6)
+
+    def test_lagrange_pinwheel_is_equilateral(self):
+        scenario = get_scenario("lagrange")
+        world = World(scenario.bodies, scenario.g)
+        s = math.sqrt(3.0)
+        p1, p2, p3 = world.bodies[0].pos, world.bodies[1].pos, world.bodies[2].pos
+        self.assertAlmostEqual(p1.distance_to(p2), s, places=5)
+        self.assertAlmostEqual(p2.distance_to(p3), s, places=5)
+        self.assertAlmostEqual(p3.distance_to(p1), s, places=5)
 
     def test_every_scenario_is_valid_and_centred(self):
         for scenario in SCENARIOS.values():

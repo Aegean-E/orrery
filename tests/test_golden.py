@@ -6,7 +6,7 @@ import unittest
 from orrery.cli import main
 
 GOLDEN = Path(__file__).resolve().parent / "golden"
-KEYS = ("solar", "figure-eight", "binary", "trojans", "pythagorean")
+KEYS = ("solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange")
 
 
 class GoldenFrameTests(unittest.TestCase):

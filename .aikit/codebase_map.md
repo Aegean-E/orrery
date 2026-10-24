@@ -7,10 +7,10 @@
 
 ## 📊 Codebase Metrics
 - **Total Python Modules**: `18`
-- **Total Classes**: `24`
-- **Total Top-Level Functions**: `59`
-- **Total Class Methods**: `119`
-- **Total Source Lines**: `2705`
+- **Total Classes**: `26`
+- **Total Top-Level Functions**: `61`
+- **Total Class Methods**: `132`
+- **Total Source Lines**: `3004`
 
 ---
 
@@ -33,13 +33,18 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `733` lines (`29499` bytes)
+**Size**: `911` lines (`36631` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
   - Method `.__init__(message, why, fix, code)`
 - `class TriadParser` - *Argparse that turns a usage error into the Error/Why/Fix triad.*
   - Method `.error(message)` - *Print usage and the Error/Why/Fix triad, then exit 2.*
+- `class KeyboardReader` - *Non-blocking single-key reader with automatic terminal restore.*
+  - Method `.__init__(enabled)`
+  - Method `.__enter__()`
+  - Method `.__exit__(*args)`
+  - Method `.poll()` - *Return the next pressed character if one is available, or None.*
 
 **Functions:**
 - `def _scenario(name)`
@@ -62,7 +67,8 @@
 - `def _catalog_payload(scenario)`
 - `def _cmd_list(args)`
 - `def _cmd_info(args)`
-- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille)`
+- `def _sparkline(values, width, *, ascii_only)` - *Render a compact sparkline trend string for a series of numeric samples.*
+- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused)`
 - `def _simulate(scenario, target, trail_limit)`
 - `def _cmd_snapshot(args)`
 - `def _enable_windows_ansi()` - *Enable VT processing when possible; return whether ANSI control is safe.*
@@ -123,7 +129,7 @@
 ### [`orrery/scenarios.py`](orrery/scenarios.py)
 > *The built-in worlds.*
 
-**Size**: `356` lines (`12666` bytes)
+**Size**: `394` lines (`13931` bytes)
 
 **Classes:**
 - `class Scenario` - *A named initial state plus the knobs the player needs to present it.*
@@ -138,6 +144,7 @@
 - `def _binary()`
 - `def _trojans()`
 - `def _pythagorean()` - *The classic 3-4-5 three-body problem: rest, a close encounter, then ejection.*
+- `def _lagrange()` - *Lagrange's 1772 equilateral pinwheel: three equal masses in a rigid rotating triangle.*
 - `def scenario_keys()`
 - `def get_scenario(name)` - *Resolve a key or a forgiving alias; raise KeyError when nothing matches.*
 
@@ -186,13 +193,14 @@
 ### [`orrery/trails.py`](orrery/trails.py)
 > *Bounded, sampled position history for drawing orbit trails.*
 
-**Size**: `56` lines (`2036` bytes)
+**Size**: `63` lines (`2387` bytes)
 
 **Classes:**
 - `class TrailRecorder` - *Keep one bounded deque of past positions per body, sampled every N steps.*
   - Method `.__init__(world, limit)`
   - Property `.trails`
   - Method `.record(world)`
+  - Method `.clear(world)` - *Clear historical trail samples, seeding with current positions if world is given.*
   - Method `.advance(world, dt, steps, every)`
   - Method `.advance_to(world, target, dt, every)`
 
@@ -204,7 +212,7 @@
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `246` lines (`11400` bytes)
+**Size**: `289` lines (`13262` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -235,6 +243,12 @@
   - Method `.test_overflowing_export_window_is_a_friendly_error()`
   - Method `.test_export_json_contains_metadata_and_samples()`
   - Method `.test_export_always_includes_the_final_state()`
+- `class InteractiveAndTelemetryTests`
+  - Method `.test_sparkline_rendering()`
+  - Method `.test_keyboard_reader_disabled()`
+  - Method `.test_snapshot_telemetry_output()`
+  - Method `.test_run_telemetry_and_no_controls()`
+  - Method `.test_run_interactive_keyboard_events()`
 
 **Functions:**
 - `def run_cli(*argv)`
@@ -266,7 +280,7 @@
 ---
 
 ### [`tests/test_golden.py`](tests/test_golden.py)
-**Size**: `28` lines (`869` bytes)
+**Size**: `28` lines (`881` bytes)
 
 **Classes:**
 - `class GoldenFrameTests`
@@ -275,13 +289,14 @@
 ---
 
 ### [`tests/test_invariants.py`](tests/test_invariants.py)
-**Size**: `57` lines (`2639` bytes)
+**Size**: `70` lines (`3311` bytes)
 
 **Classes:**
 - `class InvariantTests`
   - Method `.test_angular_momentum_is_conserved_scenario_wide()`
   - Method `.test_binary_remains_bound_for_ninety_days()`
   - Method `.test_trojans_hold_their_lagrange_angles_for_ten_years()`
+  - Method `.test_lagrange_pinwheel_returns_after_one_period()`
 
 ---
 
@@ -324,11 +339,12 @@
 ---
 
 ### [`tests/test_scenarios.py`](tests/test_scenarios.py)
-**Size**: `84` lines (`3692` bytes)
+**Size**: `93` lines (`4154` bytes)
 
 **Classes:**
 - `class ScenarioTests`
-  - Method `.test_exactly_five_distinct_scenarios()`
+  - Method `.test_exactly_six_distinct_scenarios()`
+  - Method `.test_lagrange_pinwheel_is_equilateral()`
   - Method `.test_every_scenario_is_valid_and_centred()`
   - Method `.test_solar_earth_has_its_real_orbit()`
   - Method `.test_trojan_asteroids_straddle_jupiter()`
@@ -357,7 +373,7 @@
 ---
 
 ### [`tests/test_trails.py`](tests/test_trails.py)
-**Size**: `52` lines (`1924` bytes)
+**Size**: `63` lines (`2375` bytes)
 
 **Classes:**
 - `class TrailRecorderTests`
@@ -366,6 +382,7 @@
   - Method `.test_sampling_every_other_step()`
   - Method `.test_advance_to_uses_a_short_final_step()`
   - Method `.test_zero_limit_disables_history()`
+  - Method `.test_clear_resets_trail_history()`
   - Method `.test_invalid_arguments_are_rejected()`
 
 ---

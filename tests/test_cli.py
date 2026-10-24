@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from orrery.cli import _viewport, main
+from orrery.cli import KeyboardReader, _sparkline, _viewport, main
 from orrery.scenarios import SCENARIOS
 from orrery.sim import World
 
@@ -23,7 +23,7 @@ class ListAndInfoTests(unittest.TestCase):
     def test_list_shows_every_scenario(self):
         code, output = run_cli("list")
         self.assertEqual(code, 0)
-        for key in ("solar", "figure-eight", "binary", "trojans", "pythagorean"):
+        for key in ("solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange"):
             self.assertIn(key, output)
 
     def test_list_json_is_a_machine_readable_catalogue(self):
@@ -31,7 +31,7 @@ class ListAndInfoTests(unittest.TestCase):
         self.assertEqual(code, 0)
         catalogue = json.loads(output)
         self.assertEqual([entry["key"] for entry in catalogue],
-                         ["solar", "figure-eight", "binary", "trojans", "pythagorean"])
+                         ["solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange"])
         self.assertEqual(catalogue[0]["units"]["distance"], "AU")
         self.assertEqual(catalogue[0]["extent"], [1.75, 1.7])
 
@@ -240,6 +240,49 @@ class ExportTests(unittest.TestCase):
                 rows = list(csv.reader(handle))
             self.assertEqual(len(rows), 1 + 2 * 5)
             self.assertEqual(sorted({row[0] for row in rows[1:]}), ["0", "1"])
+
+
+class InteractiveAndTelemetryTests(unittest.TestCase):
+    def test_sparkline_rendering(self):
+        self.assertEqual(_sparkline([], 10), "")
+        flat = _sparkline([1.0, 1.0, 1.0], 5, ascii_only=True)
+        self.assertEqual(len(flat), 3)
+        spark = _sparkline([-1.0, 0.0, 1.0], 10, ascii_only=True)
+        self.assertEqual(len(spark), 3)
+        self.assertEqual(spark[0], ".")
+        self.assertEqual(spark[-1], "#")
+
+    def test_keyboard_reader_disabled(self):
+        reader = KeyboardReader(enabled=False)
+        with reader as kb:
+            self.assertIsNone(kb.poll())
+
+    def test_snapshot_telemetry_output(self):
+        code, output = run_cli("snapshot", "solar", "--telemetry", "--ascii", "--no-color", "--no-trail")
+        self.assertEqual(code, 0)
+        self.assertIn("trend: [", output)
+        self.assertIn("min:", output)
+        self.assertIn("max:", output)
+
+    def test_run_telemetry_and_no_controls(self):
+        code, output = run_cli("run", "solar", "--frames", "1", "--telemetry",
+                               "--no-controls", "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertIn("trend: [", output)
+
+    def test_run_interactive_keyboard_events(self):
+        keys = iter([" ", "+", "-", "c", "t", "q"])
+
+        def fake_poll(self):
+            return next(keys, None)
+
+        with mock.patch.object(KeyboardReader, "poll", fake_poll):
+            with mock.patch("sys.stdout.isatty", return_value=True):
+                with mock.patch("sys.stdin.isatty", return_value=True):
+                    code, output = run_cli("run", "solar", "--frames", "0",
+                                           "--ascii", "--no-color")
+                    self.assertEqual(code, 0)
+                    self.assertIn("Stopped at t =", output)
 
 
 if __name__ == "__main__":

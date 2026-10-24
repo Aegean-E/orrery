@@ -33,6 +33,17 @@ class TrailRecorderTests(unittest.TestCase):
         recorder.advance(world, 1.0, 2)
         self.assertEqual(list(recorder.trails[0]), [])
 
+    def test_clear_resets_trail_history(self):
+        world = self._world()
+        recorder = TrailRecorder(world, 10)
+        recorder.advance(world, 1.0, 5)
+        self.assertGreater(len(recorder.trails[0]), 1)
+        recorder.clear(world)
+        self.assertEqual(len(recorder.trails[0]), 1)
+        self.assertEqual(recorder.trails[0][0].x, world.bodies[0].pos.x)
+        recorder.clear()
+        self.assertEqual(len(recorder.trails[0]), 0)
+
     def test_invalid_arguments_are_rejected(self):
         world = self._world()
         with self.assertRaises(ValueError):

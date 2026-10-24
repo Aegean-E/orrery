@@ -314,6 +314,40 @@ def _pythagorean() -> Scenario:
     )
 
 
+def _lagrange() -> Scenario:
+    """Lagrange's 1772 equilateral pinwheel: three equal masses in a rigid rotating triangle."""
+    s = math.sqrt(3.0)
+    v = 1.0 / (3.0 ** 0.25)
+    bodies = (
+        Body("Alpha", 1.0, Vec2(1.0, 0.0), Vec2(0.0, v), "A", "cyan"),
+        Body("Beta", 1.0, Vec2(-0.5, s / 2.0), Vec2(-v * s / 2.0, -v * 0.5), "B", "yellow"),
+        Body("Gamma", 1.0, Vec2(-0.5, -s / 2.0), Vec2(v * s / 2.0, -v * 0.5), "C", "magenta"),
+    )
+    return Scenario(
+        key="lagrange",
+        title="Lagrange Equilateral Pinwheel",
+        description=(
+            "Lagrange's 1772 three-body solution: three equal masses at the vertices of an "
+            "equilateral triangle rotate about their common barycentre in rigid harmony."
+        ),
+        g=1.0,
+        dt=0.001,
+        span=3.0,
+        extent=(1.2, 1.2),
+        bodies=bodies,
+        steps_per_frame=40,
+        trail_length=4000,
+        record_every=1,
+        default_frames=210,
+        export_until=2.0 * math.pi * (3.0 ** 0.25),
+        time_unit="t",
+        distance_unit="u",
+        mass_unit="m",
+        speed_unit="u/t",
+        speed_scale=1.0,
+    )
+
+
 SCENARIOS: dict[str, Scenario] = {
     scenario.key: scenario
     for scenario in (
@@ -322,6 +356,7 @@ SCENARIOS: dict[str, Scenario] = {
         _binary(),
         _trojans(),
         _pythagorean(),
+        _lagrange(),
     )
 }
 
@@ -339,6 +374,9 @@ _ALIASES = {
     "pythagoras": "pythagorean",
     "chaos": "pythagorean",
     "three-four-five": "pythagorean",
+    "triangle": "lagrange",
+    "equilateral": "lagrange",
+    "pinwheel": "lagrange",
 }
 
 

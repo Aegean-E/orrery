@@ -352,23 +352,133 @@ def _cmd_info(args: argparse.Namespace) -> int:
     return 0
 
 
+_SPARK_UNICODE = (" ", "▂", "▃", "▄", "▅", "▆", "▇", "█")
+_SPARK_ASCII = (".", "-", "=", "#")
+
+
+def _sparkline(values: Sequence[float], width: int, *, ascii_only: bool = False) -> str:
+    """Render a compact sparkline trend string for a series of numeric samples."""
+    if not values:
+        return ""
+    recent = list(values[-width:])
+    min_val = min(recent)
+    max_val = max(recent)
+    span = max_val - min_val
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    use_ascii = ascii_only
+    if not use_ascii:
+        try:
+            "".join(_SPARK_UNICODE).encode(encoding)
+        except (UnicodeEncodeError, LookupError):
+            use_ascii = True
+    glyphs = _SPARK_ASCII if use_ascii else _SPARK_UNICODE
+    if span <= 1e-15:
+        return glyphs[len(glyphs) // 2] * len(recent)
+    chars = []
+    for val in recent:
+        index = int((val - min_val) / span * (len(glyphs) - 1))
+        index = max(0, min(len(glyphs) - 1, index))
+        chars.append(glyphs[index])
+    return "".join(chars)
+
+
+class KeyboardReader:
+    """Non-blocking single-key reader with automatic terminal restore."""
+
+    def __init__(self, enabled: bool = True) -> None:
+        self.enabled = enabled and sys.stdin.isatty()
+        self._old_settings = None
+
+    def __enter__(self) -> KeyboardReader:
+        if not self.enabled:
+            return self
+        if os.name != "nt":
+            try:
+                import termios
+                import tty
+
+                fd = sys.stdin.fileno()
+                self._old_settings = termios.tcgetattr(fd)
+                tty.setcbreak(fd)
+            # hygiene: allow terminal setup is best-effort
+            except Exception:
+                self.enabled = False
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        if self._old_settings is not None and os.name != "nt":
+            try:
+                import termios
+
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._old_settings)
+            # hygiene: allow terminal teardown is best-effort
+            except Exception:
+                pass
+
+    def poll(self) -> str | None:
+        """Return the next pressed character if one is available, or None."""
+        if not self.enabled:
+            return None
+        if os.name == "nt":
+            try:
+                import msvcrt
+
+                if msvcrt.kbhit():
+                    return msvcrt.getwch()
+            # hygiene: allow non-blocking read is best-effort
+            except Exception:
+                return None
+            return None
+        try:
+            import select
+
+            rlist, _, _ = select.select([sys.stdin], [], [], 0)
+            if rlist:
+                return sys.stdin.read(1)
+        # hygiene: allow non-blocking read is best-effort
+        except Exception:
+            return None
+        return None
+
+
 def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
                    recorder: TrailRecorder, initial_energy: float,
-                   *, ascii_only: bool, color: bool, braille: bool = False) -> str:
+                   *, ascii_only: bool, color: bool, braille: bool = False,
+                   telemetry: bool = False,
+                   energy_history: Sequence[float] | None = None,
+                   initial_momentum: float | None = None,
+                   controls_hint: bool = False,
+                   paused: bool = False) -> str:
     bar = "-" * viewport.width if ascii_only else "─" * viewport.width
     separator = " | " if ascii_only else " · "
     drift_label = "dE/E" if ascii_only else "ΔE/E"
-    title = _truncate(f"ORRERY{separator}{scenario.title}", viewport.width)
+    pause_tag = "[PAUSED] " if paused else ""
+    title = _truncate(f"{pause_tag}ORRERY{separator}{scenario.title}", viewport.width)
     lines = [title, bar]
     lines.extend(render_scene(world, recorder.trails, viewport,
                               ascii_only=ascii_only, color=color, braille=braille))
     lines.append(bar)
+    current_drift = world.energy_drift(initial_energy)
     stats = [
         f"t = {world.time:,.2f} {scenario.time_unit}",
         f"bodies = {len(world.bodies)}",
-        f"{drift_label} = {world.energy_drift(initial_energy):+.2e}",
+        f"{drift_label} = {current_drift:+.2e}",
     ]
     lines.extend(_pack_tokens(stats, viewport.width, separator="    "))
+    if telemetry:
+        history = list(energy_history) if energy_history else [current_drift]
+        spark_width = max(6, min(20, viewport.width - 34))
+        spark = _sparkline(history, spark_width, ascii_only=ascii_only)
+        telemetry_tokens = [
+            f"{drift_label} trend: [{spark}]",
+            f"min: {min(history):+.2e}",
+            f"max: {max(history):+.2e}",
+        ]
+        if initial_momentum is not None:
+            dl = world.angular_momentum() - initial_momentum
+            dl_label = "dLz" if ascii_only else "ΔLz"
+            telemetry_tokens.append(f"{dl_label}: {dl:+.2e}")
+        lines.extend(_pack_tokens(telemetry_tokens, viewport.width, separator="  "))
     legend = []
     for body in world.bodies:
         if color:
@@ -376,6 +486,15 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
         else:
             legend.append(f"{body.symbol} {body.name}")
     lines.extend(_pack_tokens(legend, viewport.width))
+    if controls_hint:
+        hint_text = "[Space] Pause  [+/-] Speed  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
+        if len(hint_text) <= viewport.width:
+            lines.append(hint_text)
+        else:
+            lines.extend(_pack_tokens([
+                "[Space] Pause", "[+/-] Speed", "[C] Clear",
+                "[R] Reset", "[T] Telemetry", "[Q] Quit",
+            ], viewport.width, separator="  "))
     return "\n".join(lines)
 
 
@@ -416,8 +535,13 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
         color = _enable_windows_ansi()
     ascii_only = not _unicode_enabled(args)
     braille = (not ascii_only) and not getattr(args, "no_braille", False)
-    frame = _compose_frame(world, scenario, viewport, recorder, initial_energy,
-                           ascii_only=ascii_only, color=color, braille=braille)
+    frame = _compose_frame(
+        world, scenario, viewport, recorder, initial_energy,
+        ascii_only=ascii_only, color=color, braille=braille,
+        telemetry=getattr(args, "telemetry", False),
+        energy_history=[world.energy_drift(initial_energy)],
+        initial_momentum=world.angular_momentum(),
+    )
     print(frame)
     return 0
 
@@ -468,32 +592,80 @@ def _cmd_run(args: argparse.Namespace) -> int:
         color = False
     screen_control = interactive and vt_ready
     world, recorder, initial_energy = _simulate(scenario, 0.0, _trail_limit(args, scenario))
+    initial_momentum = world.angular_momentum()
+    energy_history: list[float] = [world.energy_drift(initial_energy)]
     viewport = _viewport(scenario, width, height, _aspect(args))
     frame_index = 0
     stopped = False
+    paused = False
+    fps = args.fps
+    telemetry_enabled = getattr(args, "telemetry", False)
+    controls_enabled = interactive and not getattr(args, "no_controls", False)
+    show_hints = controls_enabled
+
     if screen_control:
         sys.stdout.write("\x1b[?25l")
         sys.stdout.flush()
-    try:
-        while frames == 0 or frame_index < frames:
-            recorder.advance(world, scenario.dt, scenario.steps_per_frame,
-                             scenario.record_every)
-            frame_index += 1
+    with KeyboardReader(enabled=controls_enabled) as keyboard:
+        try:
+            while frames == 0 or frame_index < frames:
+                key = keyboard.poll()
+                while key is not None:
+                    if key in ("q", "Q", "\x03"):
+                        stopped = True
+                        break
+                    if key == " ":
+                        paused = not paused
+                    elif key in ("+", "="):
+                        fps = min(MAX_FPS, fps * 1.5)
+                    elif key in ("-", "_"):
+                        fps = max(MIN_FPS, fps / 1.5)
+                    elif key in ("c", "C"):
+                        recorder.clear(world)
+                    elif key in ("r", "R"):
+                        world, recorder, initial_energy = _simulate(
+                            scenario, 0.0, _trail_limit(args, scenario)
+                        )
+                        initial_momentum = world.angular_momentum()
+                        energy_history = [world.energy_drift(initial_energy)]
+                    elif key in ("t", "T"):
+                        telemetry_enabled = not telemetry_enabled
+                    elif key in ("h", "?"):
+                        show_hints = not show_hints
+                    key = keyboard.poll()
+
+                if stopped:
+                    break
+
+                if not paused:
+                    recorder.advance(world, scenario.dt, scenario.steps_per_frame,
+                                     scenario.record_every)
+                    frame_index += 1
+                    energy_history.append(world.energy_drift(initial_energy))
+                    if len(energy_history) > 60:
+                        energy_history.pop(0)
+
+                if screen_control:
+                    sys.stdout.write("\x1b[H\x1b[2J")
+                sys.stdout.write(_compose_frame(
+                    world, scenario, viewport, recorder, initial_energy,
+                    ascii_only=ascii_only, color=color, braille=braille,
+                    telemetry=telemetry_enabled,
+                    energy_history=energy_history,
+                    initial_momentum=initial_momentum,
+                    controls_hint=show_hints,
+                    paused=paused,
+                ) + "\n")
+                sys.stdout.flush()
+                if frames == 0 or frame_index < frames:
+                    sleep_time = 0.05 if paused else (1.0 / fps)
+                    time.sleep(sleep_time)
+        except KeyboardInterrupt:
+            stopped = True
+        finally:
             if screen_control:
-                sys.stdout.write("\x1b[H\x1b[2J")
-            sys.stdout.write(_compose_frame(
-                world, scenario, viewport, recorder, initial_energy,
-                ascii_only=ascii_only, color=color, braille=braille,
-            ) + "\n")
-            sys.stdout.flush()
-            if frames == 0 or frame_index < frames:
-                time.sleep(1.0 / args.fps)
-    except KeyboardInterrupt:
-        stopped = True
-    finally:
-        if screen_control:
-            sys.stdout.write("\x1b[?25h\n")
-            sys.stdout.flush()
+                sys.stdout.write("\x1b[?25h\n")
+                sys.stdout.flush()
     if stopped:
         print(f"Stopped at t = {world.time:,.2f} {scenario.time_unit}.")
     return 0
@@ -686,6 +858,8 @@ def build_parser() -> argparse.ArgumentParser:
                           help="simulation time to reach before drawing")
     snapshot.add_argument("--force", action="store_true",
                           help="allow a snapshot beyond the integration-step budget")
+    snapshot.add_argument("--telemetry", action="store_true",
+                          help="display live energy drift trend in footer")
     _add_view_options(snapshot, trails=True)
     snapshot.set_defaults(handler=_cmd_snapshot)
 
@@ -696,6 +870,10 @@ def build_parser() -> argparse.ArgumentParser:
                           "(default: forever on a terminal, one still when piped)")
     run.add_argument("--fps", type=float, default=24.0,
                      help=f"frames per second, {MIN_FPS:g}-{MAX_FPS:g} (default: 24)")
+    run.add_argument("--telemetry", action="store_true",
+                     help="display live energy drift sparkline and telemetry HUD")
+    run.add_argument("--no-controls", action="store_true",
+                     help="disable interactive keyboard controls")
     _add_view_options(run, trails=True)
     run.set_defaults(handler=_cmd_run)
 

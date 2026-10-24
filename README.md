@@ -1,6 +1,6 @@
 # orrery
 
-An N-body gravitational sandbox that runs in your terminal. Five carefully chosen worlds, a
+An N-body gravitational sandbox that runs in your terminal. Six carefully chosen worlds, a
 symplectic integrator, live energy diagnostics, orbit trails, CSV and JSON export, and no
 dependencies outside the Python standard library.
 
@@ -81,7 +81,7 @@ pass `--no-braille` for one-cell trail marks, or `--ascii` to force ASCII border
 | Repair memory and map, then check | `python aikit.py fix orrery` |
 | Resume an interrupted task | `python aikit.py resume orrery` |
 
-## 🌍 The Five Worlds
+## 🌍 The Six Worlds
 
 | Key | Bodies | What it shows |
 |---|---|---|
@@ -101,8 +101,8 @@ more resolve to the right scenario.
 python -m orrery list [--json]
 python -m orrery info KEY|FILE [--json]
 python -m orrery validate FILE
-python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
-python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
 python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME]
 ```
 
@@ -112,6 +112,9 @@ python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [
 - `run` loops on a terminal; `--frames 0` loops forever, and a piped run defaults to one still.
   Frame rates are limited to `0.1`–`240` fps so a typo cannot sleep for years. `--aspect` overrides
   the assumed 2:1 character-cell ratio when your font or terminal differs.
+  Interactive keyboard controls on terminals: Space pauses/resumes, +/- adjusts speed,
+  c clears trails, 
+ resets the simulation, 	 toggles live telemetry HUD, and q quits.
 - `info` prints initial distances, osculating orbital elements and energy. `--json` is stable and
   machine-readable. If no single body dominates (the figure-eight and binary worlds), the
   two-body orbit columns are deliberately blank rather than misleading.
@@ -223,7 +226,7 @@ orrery/
 
 ## 🧪 Verification
 
-The suite is 77 tests and completes in about 1.0 second:
+The suite is 85 tests and completes in about 1.4 seconds:
 
 ```bash
 python -m unittest discover -s tests -t .
@@ -271,7 +274,7 @@ types ship with the package (`py.typed`).
 ## 📚 Design Notes
 
 The integrator, unit policy, rendering boundary, viewport fitting and work caps are recorded in
-`.aikit/decisions.md` (ADR-001 through ADR-003).
+`.aikit/decisions.md` (ADR-001 through ADR-005).
 
 ## 📄 License
 

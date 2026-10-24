@@ -30,6 +30,13 @@ class TrailRecorder:
         for trail, body in zip(self._trails, world.bodies):
             trail.append(body.pos)
 
+    def clear(self, world: World | None = None) -> None:
+        """Clear historical trail samples, seeding with current positions if world is given."""
+        for index, trail in enumerate(self._trails):
+            trail.clear()
+            if world is not None and index < len(world.bodies):
+                trail.append(world.bodies[index].pos)
+
     def advance(self, world: World, dt: float, steps: int, every: int = 1) -> None:
         if steps < 0:
             raise ValueError("steps cannot be negative")

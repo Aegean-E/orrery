@@ -52,6 +52,19 @@ class InvariantTests(unittest.TestCase):
                 self.assertAlmostEqual(asteroid.pos.distance_to(sun.pos), 5.2038,
                                        delta=1e-3)
 
+    def test_lagrange_pinwheel_returns_after_one_period(self):
+        scenario = get_scenario("lagrange")
+        world = World(scenario.bodies, scenario.g)
+        initial_energy = world.total_energy()
+        period = 2.0 * math.pi * (3.0 ** 0.25)
+        world.advance_to(period, scenario.dt)
+        self.assertLess(abs(world.energy_drift(initial_energy)), 1e-12)
+        s = math.sqrt(3.0)
+        p1, p2, p3 = world.bodies[0].pos, world.bodies[1].pos, world.bodies[2].pos
+        self.assertAlmostEqual(p1.distance_to(p2), s, places=5)
+        self.assertAlmostEqual(p2.distance_to(p3), s, places=5)
+        self.assertAlmostEqual(p3.distance_to(p1), s, places=5)
+
 
 if __name__ == "__main__":
     unittest.main()
