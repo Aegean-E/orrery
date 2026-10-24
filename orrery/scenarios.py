@@ -40,6 +40,7 @@ class Scenario:
     speed_unit: str
     speed_scale: float
     c: float | None = None
+    k_e: float = 0.0
 
     def __post_init__(self) -> None:
         if not self.key or not self.title or not self.description:
@@ -48,6 +49,8 @@ class Scenario:
             raise ValueError(f"scenario '{self.key}' needs a positive finite G")
         if self.c is not None and (not math.isfinite(self.c) or self.c <= 0.0):
             raise ValueError(f"scenario '{self.key}' needs a positive finite speed of light")
+        if not math.isfinite(self.k_e) or self.k_e < 0.0:
+            raise ValueError(f"scenario '{self.key}' needs a non-negative finite Coulomb constant")
         if not math.isfinite(self.dt) or self.dt <= 0.0:
             raise ValueError(f"scenario '{self.key}' needs a positive finite time step")
         if not math.isfinite(self.span) or self.span <= 0.0:
@@ -357,6 +360,117 @@ def _lagrange() -> Scenario:
     )
 
 
+def _rutherford() -> Scenario:
+    """Rutherford alpha particle scattering against a heavy gold nucleus (+79e)."""
+    nucleus = Body("Gold", 197.0, Vec2(0.0, 0.0), Vec2(0.0, 0.0), "N", "yellow", charge=79.0)
+    v_in = 2.0
+    x_start = -2.5
+    alphas = (
+        Body("Alpha-1", 4.0, Vec2(x_start, 0.15), Vec2(v_in, 0.0), "a", "cyan", charge=2.0),
+        Body("Alpha-2", 4.0, Vec2(x_start, 0.50), Vec2(v_in, 0.0), "b", "green", charge=2.0),
+        Body("Alpha-3", 4.0, Vec2(x_start, 1.20), Vec2(v_in, 0.0), "c", "magenta", charge=2.0),
+    )
+    return Scenario(
+        key="rutherford",
+        title="Rutherford Alpha Scattering",
+        description=(
+            "Alpha particles (+2e) fired at a gold nucleus (+79e). Demonstrates hyperbolic "
+            "Rutherford scattering governed by inverse-square Coulomb electrostatic repulsion: "
+            "particles with small impact parameters experience sharp deflection."
+        ),
+        g=0.001,
+        dt=0.002,
+        span=6.0,
+        extent=(3.0, 3.0),
+        bodies=_center_and_zero_momentum((nucleus, *alphas)),
+        steps_per_frame=20,
+        trail_length=3000,
+        record_every=1,
+        default_frames=200,
+        export_until=3.0,
+        time_unit="fs",
+        distance_unit="fm",
+        mass_unit="u",
+        speed_unit="fm/fs",
+        speed_scale=1.0,
+        c=50.0,
+        k_e=0.1,
+    )
+
+
+def _bohr() -> Scenario:
+    """Semi-classical Bohr atom: electrons in circular orbits around a central proton."""
+    proton = Body("Proton", 100.0, Vec2(0.0, 0.0), Vec2(0.0, 0.0), "+", "red", charge=1.0)
+    v1 = math.sqrt(1.0 / 0.8)
+    v2 = math.sqrt(1.0 / 1.6)
+    electrons = (
+        Body("Electron-1", 0.01, Vec2(0.8, 0.0), Vec2(0.0, v1), "-", "cyan", charge=-1.0),
+        Body("Electron-2", 0.01, Vec2(-1.6, 0.0), Vec2(0.0, -v2), "e", "magenta", charge=-1.0),
+    )
+    return Scenario(
+        key="bohr",
+        title="Bohr Planetary Atom",
+        description=(
+            "A semi-classical Bohr atom model: electrons in stable orbits around a central "
+            "proton, bound by attractive inverse-square Coulomb electrostatic forces."
+        ),
+        g=0.0001,
+        dt=0.002,
+        span=4.0,
+        extent=(2.0, 2.0),
+        bodies=_center_and_zero_momentum((proton, *electrons)),
+        steps_per_frame=25,
+        trail_length=4000,
+        record_every=1,
+        default_frames=220,
+        export_until=15.0,
+        time_unit="as",
+        distance_unit="pm",
+        mass_unit="me",
+        speed_unit="pm/as",
+        speed_scale=1.0,
+        c=30.0,
+        k_e=0.01,
+    )
+
+
+def _black_hole() -> Scenario:
+    """Relativistic black hole with high-velocity probes exhibiting 1PN orbital precession."""
+    singularity = Body("Singularity", 40.0, Vec2(0.0, 0.0), Vec2(0.0, 0.0), "*", "red")
+    v1 = math.sqrt(40.0 * 1.35 / 0.7)
+    v2 = math.sqrt(40.0 / 2.0)
+    probes = (
+        Body("Probe-Alpha", 0.001, Vec2(0.7, 0.0), Vec2(0.0, v1), "a", "cyan"),
+        Body("Probe-Beta", 0.001, Vec2(0.0, 2.0), Vec2(-v2, 0.0), "b", "gold"),
+    )
+    return Scenario(
+        key="black-hole",
+        title="Relativistic Black Hole",
+        description=(
+            "A compact gravitational singularity surrounded by high-velocity relativistic probes. "
+            "The inner probe travels at >40% the speed of light, producing pronounced 1PN general "
+            "relativistic rosette precession (Schwarzschild radius r_s = 0.20)."
+        ),
+        g=1.0,
+        dt=0.001,
+        span=5.0,
+        extent=(2.5, 2.5),
+        bodies=_center_and_zero_momentum((singularity, *probes)),
+        steps_per_frame=30,
+        trail_length=5000,
+        record_every=1,
+        default_frames=240,
+        export_until=10.0,
+        time_unit="t",
+        distance_unit="u",
+        mass_unit="m",
+        speed_unit="u/t",
+        speed_scale=1.0,
+        c=20.0,
+        k_e=0.0,
+    )
+
+
 SCENARIOS: dict[str, Scenario] = {
     scenario.key: scenario
     for scenario in (
@@ -366,6 +480,9 @@ SCENARIOS: dict[str, Scenario] = {
         _trojans(),
         _pythagorean(),
         _lagrange(),
+        _rutherford(),
+        _bohr(),
+        _black_hole(),
     )
 }
 
@@ -386,6 +503,19 @@ _ALIASES = {
     "triangle": "lagrange",
     "equilateral": "lagrange",
     "pinwheel": "lagrange",
+    "rutherford": "rutherford",
+    "gold-foil": "rutherford",
+    "alpha": "rutherford",
+    "scattering": "rutherford",
+    "bohr": "bohr",
+    "atom": "bohr",
+    "hydrogen": "bohr",
+    "planetary-atom": "bohr",
+    "black-hole": "black-hole",
+    "blackhole": "black-hole",
+    "singularity": "black-hole",
+    "bh": "black-hole",
+    "schwarzschild": "black-hole",
 }
 
 

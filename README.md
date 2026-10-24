@@ -81,7 +81,7 @@ pass `--no-braille` for one-cell trail marks, or `--ascii` to force ASCII border
 | Repair memory and map, then check | `python aikit.py fix orrery` |
 | Resume an interrupted task | `python aikit.py resume orrery` |
 
-## 🌍 The Six Worlds
+## 🌍 The Built-in Worlds
 
 | Key | Bodies | What it shows |
 |---|---|---|
@@ -91,10 +91,13 @@ pass `--no-braille` for one-cell trail marks, or `--ascii` to force ASCII border
 | `trojans` | Sun, Jupiter, Achilles, Patroclus | The stable L4 and L5 Lagrange points, 60° ahead of and behind Jupiter. |
 | `pythagorean` | Three, Four, Five | The classic 3-4-5 three-body problem: the masses start at rest, have a close chaotic encounter, and two are slung outward. |
 | `lagrange` | Three equal masses | The 1772 Euler-Lagrange pinwheel: three equal masses at the vertices of an equilateral triangle rotating rigidly. |
+| `rutherford` | Gold nucleus, 3 Alpha particles | Rutherford alpha scattering: Coulomb electrostatic repulsion ($+79e$ vs $+2e$) producing hyperbolic deflections. |
+| `bohr` | Proton, 2 Electrons | Semi-classical Bohr planetary atom: electrons in stable orbits bound by inverse-square Coulomb attraction. |
+| `black-hole` | Singularity, 2 Relativistic probes | Relativistic black hole ($r_s = 0.20$): high-velocity probes ($>40\% c$) undergoing 1PN general relativistic rosette precession. |
 
 Aliases are forgiving: `inner`, `inner-solar-system`, `solar-system`, `figure-8`, `figure8`,
-`eight`, `three-body`, `circumbinary`, `trojan`, `jupiter-trojans`, `pythagoras`, `chaos` and
-more resolve to the right scenario.
+`eight`, `three-body`, `circumbinary`, `trojan`, `jupiter-trojans`, `pythagoras`, `chaos`, `atom`,
+`gold-foil`, `bh`, `singularity` and more resolve to the right scenario.
 
 ## 🕹️ Commands
 
@@ -102,9 +105,9 @@ more resolve to the right scenario.
 python -m orrery list [--json]
 python -m orrery info KEY|FILE [--json]
 python -m orrery validate FILE
-python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
-python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
-python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME] [--relativity] [--c-light C] [--merge] [--merge-radius R]
+python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E]
 ```
 
 - `list --json` emits the scenario catalogue with units, extents and initial bodies.
@@ -113,7 +116,7 @@ python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [
 - `run` loops on a terminal; `--frames 0` loops forever, and a piped run defaults to one still.
   Frame rates are limited to `0.1`–`240` fps so a typo cannot sleep for years. `--aspect` overrides
   the assumed 2:1 character-cell ratio when your font or terminal differs.
-  Interactive keyboard controls on terminals: Space pauses/resumes, . steps one frame while paused, f or 1-9 tracks bodies, WASD or arrow keys pan, [ or ] zoom, { or } calibrates aspect ratio, b cycles orbit dot styles (circle, bullet, ring, disc, dot, ascii, braille), 0 resets camera and aspect, n or p cycles scenarios, +/- adjusts speed, c clears trails, r resets simulation, t toggles live telemetry HUD, and q quits.
+  Interactive keyboard controls on terminals: Space pauses/resumes, . steps one frame while paused, f or 1-9 tracks bodies, WASD or arrow keys pan, [ or ] zoom, { or } calibrates aspect ratio, b cycles orbit dot styles (circle, bullet, ring, disc, dot, ascii, braille), 0 resets camera and aspect, n or p cycles scenarios, +/- adjusts speed, c clears trails, r resets simulation, t toggles live telemetry HUD (displaying energy drift sparkline, momentum drift, K, U, and Virial theorem 2K+U metric), and q quits.
 - `info` prints initial distances, osculating orbital elements and energy. `--json` is stable and
   machine-readable. If no single body dominates (the figure-eight and binary worlds), the
   two-body orbit columns are deliberately blank rather than misleading.
@@ -128,7 +131,7 @@ Every failure follows the same triad:
 ```text
 Error: unknown scenario 'nibiru'.
 Why: a scenario key selects one built-in initial state.
-Fix: choose one of: solar, figure-eight, binary, trojans, pythagorean, lagrange.
+Fix: choose one of: solar, figure-eight, binary, trojans, pythagorean, lagrange, rutherford, bohr, black-hole.
 ```
 
 Exit codes are `0` success, `1` runtime failure, `2` bad usage.

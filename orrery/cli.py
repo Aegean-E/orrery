@@ -227,6 +227,7 @@ def _body_payload(scenario: Scenario, body: Body, primary: Body, index: int,
     return {
         "name": body.name,
         "mass": body.mass,
+        "charge": body.charge,
         "position": {"x": body.pos.x, "y": body.pos.y},
         "velocity": {"x": body.vel.x, "y": body.vel.y},
         "speed": body.vel.norm() * scenario.speed_scale,
@@ -240,7 +241,7 @@ def _body_payload(scenario: Scenario, body: Body, primary: Body, index: int,
 def _info_payload(scenario: Scenario, world: World, primary_index: int) -> dict[str, object]:
     primary = world.bodies[primary_index]
     dominant = _dominant_primary(world)
-    return {
+    payload: dict[str, object] = {
         "key": scenario.key,
         "title": scenario.title,
         "description": scenario.description,
@@ -259,8 +260,18 @@ def _info_payload(scenario: Scenario, world: World, primary_index: int) -> dict[
             for index, body in enumerate(world.bodies)
         ],
         "energy": world.total_energy(),
+        "kinetic_energy": world.kinetic_energy(),
+        "potential_energy": world.potential_energy(),
         "angular_momentum": world.angular_momentum(),
     }
+    if world.k_e != 0.0:
+        payload["k_e"] = world.k_e
+        payload["electrostatic_energy"] = world.electrostatic_energy()
+    if world.c is not None:
+        payload["c"] = world.c
+        payload["schwarzschild_radius"] = world.schwarzschild_radius()
+        payload["relativistic_energy"] = world.relativistic_energy()
+    return payload
 
 
 def _catalog_payload(scenario: Scenario) -> dict[str, object]:
@@ -272,6 +283,7 @@ def _catalog_payload(scenario: Scenario) -> dict[str, object]:
             {
                 "name": body.name,
                 "mass": body.mass,
+                "charge": body.charge,
                 "symbol": body.symbol,
                 "color": body.color,
             }
@@ -296,6 +308,8 @@ def _catalog_payload(scenario: Scenario) -> dict[str, object]:
     }
     if scenario.c is not None:
         payload["c"] = scenario.c
+    if scenario.k_e != 0.0:
+        payload["k_e"] = scenario.k_e
     return payload
 
 
@@ -318,7 +332,7 @@ def _cmd_list(args: argparse.Namespace) -> int:
 
 def _cmd_info(args: argparse.Namespace) -> int:
     scenario = _scenario(args.key)
-    world = World(scenario.bodies, scenario.g)
+    world = World(scenario.bodies, scenario.g, c=scenario.c, k_e=scenario.k_e)
     primary_index = _primary_index(world)
     if args.json:
         print(json.dumps(_info_payload(scenario, world, primary_index),
@@ -335,6 +349,13 @@ def _cmd_info(args: argparse.Namespace) -> int:
     print(f"dt = {scenario.dt:g} {scenario.time_unit}"
           f"    span = {scenario.span:g} {scenario.distance_unit}"
           f"    bodies = {len(world.bodies)}")
+    extra_phys = []
+    if scenario.c is not None:
+        extra_phys.append(f"c = {scenario.c:g} {scenario.distance_unit}/{scenario.time_unit}")
+    if scenario.k_e != 0.0:
+        extra_phys.append(f"k_e = {scenario.k_e:g}")
+    if extra_phys:
+        print("    ".join(extra_phys))
     print()
     print(f"{'body':<10} {'mass':>11} {'r':>9} {'a':>9} {'ecc':>7} "
           f"{'period':>11} {'speed':>11}")
@@ -518,6 +539,19 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
             dl_label = "dLz" if ascii_only else "ΔLz"
             telemetry_tokens.append(f"{dl_label}: {dl:+.2e}")
         lines.extend(_pack_tokens(telemetry_tokens, viewport.width, separator="  "))
+
+        ke = world.kinetic_energy()
+        pe = world.potential_energy()
+        virial = 2.0 * ke + pe
+        energy_tokens = [
+            f"K: {ke:+.2e}",
+            f"U: {pe:+.2e}",
+            f"2K+U: {virial:+.2e}",
+        ]
+        rs = world.schwarzschild_radius()
+        if rs is not None:
+            energy_tokens.append(f"rs: {rs:.2e}")
+        lines.extend(_pack_tokens(energy_tokens, viewport.width, separator="  "))
     legend = []
     for body in world.bodies:
         if color:
@@ -538,14 +572,63 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
     return "\n".join(lines)
 
 
+def _validate_physics_args(args: argparse.Namespace) -> None:
+    c_override = getattr(args, "c_light", None)
+    if c_override is not None and (not math.isfinite(c_override) or c_override <= 0.0):
+        raise CliError(
+            f"--c-light {c_override} is not a valid speed of light.",
+            "the speed of light must be a positive finite number.",
+            "pass a positive number like --c-light 30.0",
+            code=2,
+        )
+    k_coulomb = getattr(args, "k_coulomb", None)
+    if k_coulomb is not None and (not math.isfinite(k_coulomb) or k_coulomb < 0.0):
+        raise CliError(
+            f"--k-coulomb {k_coulomb} is not a valid Coulomb constant.",
+            "the Coulomb constant must be a non-negative finite number.",
+            "pass a non-negative number like --k-coulomb 1.0",
+            code=2,
+        )
+    merge_radius = getattr(args, "merge_radius", None)
+    if merge_radius is not None and (not math.isfinite(merge_radius) or merge_radius <= 0.0):
+        raise CliError(
+            f"--merge-radius {merge_radius} is not a valid radius.",
+            "the merge radius must be a positive finite number.",
+            "pass a positive number like --merge-radius 0.02",
+            code=2,
+        )
+    bounce_radius = getattr(args, "bounce_radius", None)
+    if bounce_radius is not None and (not math.isfinite(bounce_radius) or bounce_radius <= 0.0):
+        raise CliError(
+            f"--bounce-radius {bounce_radius} is not a valid radius.",
+            "the bounce radius must be a positive finite number.",
+            "pass a positive number like --bounce-radius 0.05",
+            code=2,
+        )
+    restitution = getattr(args, "restitution", None)
+    if restitution is not None and (not math.isfinite(restitution) or not 0.0 <= restitution <= 1.0):
+        raise CliError(
+            f"--restitution {restitution} is not a valid coefficient.",
+            "the coefficient of restitution must be between 0.0 and 1.0.",
+            "pass a value between 0.0 (inelastic) and 1.0 (elastic).",
+            code=2,
+        )
+
+
 def _simulate(scenario: Scenario, target: float, trail_limit: int,
               *, relativity: bool = False, c_override: float | None = None,
-              merge_radius: float = 0.0) -> tuple[World, TrailRecorder, float]:
+              k_coulomb_override: float | None = None,
+              merge_radius: float = 0.0,
+              bounce_radius: float = 0.0,
+              restitution: float = 1.0) -> tuple[World, TrailRecorder, float]:
     c_val = c_override if c_override is not None else (scenario.c if relativity else None)
-    world = World(scenario.bodies, scenario.g, c=c_val)
+    k_val = k_coulomb_override if k_coulomb_override is not None else scenario.k_e
+    world = World(scenario.bodies, scenario.g, c=c_val, k_e=k_val)
     initial_energy = world.total_energy()
     recorder = TrailRecorder(world, trail_limit)
-    recorder.advance_to(world, target, scenario.dt, scenario.record_every, merge_radius=merge_radius)
+    recorder.advance_to(world, target, scenario.dt, scenario.record_every,
+                        merge_radius=merge_radius, bounce_radius=bounce_radius,
+                        restitution=restitution)
     return world, recorder, initial_energy
 
 
@@ -567,14 +650,19 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
             "lower --at, or pass --force to allow the full run.",
             code=2,
         )
+    _validate_physics_args(args)
     width, height = _scene_size(args)
     relativity = getattr(args, "relativity", False)
     c_override = getattr(args, "c_light", None)
+    k_coulomb = getattr(args, "k_coulomb", None)
     merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
+    bounce_radius = getattr(args, "bounce_radius", 0.0) if getattr(args, "bounce", False) else 0.0
+    restitution = getattr(args, "restitution", 1.0)
 
     world, recorder, initial_energy = _simulate(
         scenario, args.at, _trail_limit(args, scenario),
-        relativity=relativity, c_override=c_override, merge_radius=merge_radius,
+        relativity=relativity, c_override=c_override, k_coulomb_override=k_coulomb,
+        merge_radius=merge_radius, bounce_radius=bounce_radius, restitution=restitution,
     )
     viewport = _viewport(scenario, width, height, _aspect(args))
     color = _color_enabled(args)
@@ -662,13 +750,18 @@ def _cmd_run(args: argparse.Namespace) -> int:
         dot_style = "ascii" if ascii_only else "dot"
     initial_dot_style = dot_style
 
+    _validate_physics_args(args)
     relativity = getattr(args, "relativity", False)
     c_override = getattr(args, "c_light", None)
+    k_coulomb = getattr(args, "k_coulomb", None)
     merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
+    bounce_radius = getattr(args, "bounce_radius", 0.0) if getattr(args, "bounce", False) else 0.0
+    restitution = getattr(args, "restitution", 1.0)
 
     world, recorder, initial_energy = _simulate(
         scenario, 0.0, _trail_limit(args, scenario),
-        relativity=relativity, c_override=c_override, merge_radius=merge_radius,
+        relativity=relativity, c_override=c_override, k_coulomb_override=k_coulomb,
+        merge_radius=merge_radius, bounce_radius=bounce_radius, restitution=restitution,
     )
     initial_momentum = world.angular_momentum()
     energy_history: list[float] = [world.energy_drift(initial_energy)]
@@ -721,7 +814,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     elif key in ("r", "R"):
                         world, recorder, initial_energy = _simulate(
                             scenario, 0.0, _trail_limit(args, scenario),
-                            relativity=relativity, c_override=c_override, merge_radius=merge_radius,
+                            relativity=relativity, c_override=c_override,
+                            k_coulomb_override=k_coulomb,
+                            merge_radius=merge_radius, bounce_radius=bounce_radius,
+                            restitution=restitution,
                         )
                         initial_momentum = world.angular_momentum()
                         energy_history = [world.energy_drift(initial_energy)]
@@ -776,7 +872,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         scenario = get_scenario(catalog[scenario_idx])
                         world, recorder, initial_energy = _simulate(
                             scenario, 0.0, _trail_limit(args, scenario),
-                            relativity=relativity, c_override=c_override, merge_radius=merge_radius,
+                            relativity=relativity, c_override=c_override,
+                            k_coulomb_override=k_coulomb,
+                            merge_radius=merge_radius, bounce_radius=bounce_radius,
+                            restitution=restitution,
                         )
                         initial_momentum = world.angular_momentum()
                         energy_history = [world.energy_drift(initial_energy)]
@@ -790,7 +889,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
                 if not paused or single_step:
                     recorder.advance(world, scenario.dt, scenario.steps_per_frame,
-                                     scenario.record_every, merge_radius=merge_radius)
+                                     scenario.record_every, merge_radius=merge_radius,
+                                     bounce_radius=bounce_radius, restitution=restitution)
                     frame_index += 1
                     energy_history.append(world.energy_drift(initial_energy))
                     if len(energy_history) > 60:
@@ -916,10 +1016,15 @@ def _cmd_export(args: argparse.Namespace) -> int:
             code=2,
         )
     export_format = getattr(args, "format", "csv")
+    _validate_physics_args(args)
     relativity = getattr(args, "relativity", False)
     c_override = getattr(args, "c_light", None)
     c_val = c_override if c_override is not None else (scenario.c if relativity else None)
+    k_coulomb = getattr(args, "k_coulomb", None)
+    k_val = k_coulomb if k_coulomb is not None else scenario.k_e
     merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
+    bounce_radius = getattr(args, "bounce_radius", 0.0) if getattr(args, "bounce", False) else 0.0
+    restitution = getattr(args, "restitution", 1.0)
 
     metadata = _catalog_payload(scenario)
     metadata["export"] = {
@@ -930,10 +1035,15 @@ def _cmd_export(args: argparse.Namespace) -> int:
     if relativity:
         metadata["export"]["relativity"] = True
         metadata["export"]["c"] = c_val
+    if k_val != 0.0:
+        metadata["export"]["k_e"] = k_val
     if merge_radius > 0.0:
         metadata["export"]["merge_radius"] = merge_radius
+    if bounce_radius > 0.0:
+        metadata["export"]["bounce_radius"] = bounce_radius
+        metadata["export"]["restitution"] = restitution
 
-    world = World(scenario.bodies, scenario.g, c=c_val)
+    world = World(scenario.bodies, scenario.g, c=c_val, k_e=k_val)
     temporary: Path | None = None
     try:
         handle = tempfile.NamedTemporaryFile(
@@ -946,7 +1056,8 @@ def _cmd_export(args: argparse.Namespace) -> int:
                 writer = csv.writer(handle)
                 writer.writerow(["time", "body", "x", "y", "vx", "vy", "speed"])
                 for target in targets:
-                    world.advance_to(target, scenario.dt, merge_radius=merge_radius)
+                    world.advance_to(target, scenario.dt, merge_radius=merge_radius,
+                                     bounce_radius=bounce_radius, restitution=restitution)
                     for body in world.bodies:
                         writer.writerow([
                             f"{world.time:.10g}",
@@ -963,7 +1074,8 @@ def _cmd_export(args: argparse.Namespace) -> int:
                 handle.write(',\n  "samples": [')
                 first = True
                 for target in targets:
-                    world.advance_to(target, scenario.dt, merge_radius=merge_radius)
+                    world.advance_to(target, scenario.dt, merge_radius=merge_radius,
+                                     bounce_radius=bounce_radius, restitution=restitution)
                     sample = {
                         "time": world.time,
                         "bodies": [
@@ -1033,10 +1145,18 @@ def _add_physics_options(parser: argparse.ArgumentParser) -> None:
                         help="enable post-Newtonian 1PN general relativistic precession")
     parser.add_argument("--c-light", type=float, default=None,
                         help="speed of light override for 1PN relativity")
+    parser.add_argument("--k-coulomb", type=float, default=None,
+                        help="Coulomb constant override for electrostatic interactions")
     parser.add_argument("--merge", action="store_true",
                         help="enable inelastic collision coalescence")
     parser.add_argument("--merge-radius", type=float, default=0.02,
                         help="collision distance threshold for coalescence (default: 0.02)")
+    parser.add_argument("--bounce", action="store_true",
+                        help="enable elastic bounce collisions")
+    parser.add_argument("--bounce-radius", type=float, default=0.05,
+                        help="contact radius threshold for elastic bounce (default: 0.05)")
+    parser.add_argument("--restitution", type=float, default=1.0,
+                        help="coefficient of restitution for elastic bounce (0.0 to 1.0, default: 1.0)")
 
 
 def build_parser() -> argparse.ArgumentParser:

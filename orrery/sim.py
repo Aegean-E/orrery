@@ -52,7 +52,7 @@ class Vec2:
 
 @dataclass(frozen=True, slots=True)
 class Body:
-    """An immutable snapshot of one gravitating body."""
+    """An immutable snapshot of one gravitating/charged body."""
 
     name: str
     mass: float
@@ -60,6 +60,7 @@ class Body:
     vel: Vec2
     symbol: str = "o"
     color: str = "white"
+    charge: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,8 +73,9 @@ class Orbit:
 
 
 def _accelerations(bodies: Sequence[Body], g: float,
-                   c: float | None = None) -> tuple[Vec2, ...]:
-    """Pairwise Newtonian acceleration on every body, with optional 1PN general relativity."""
+                   c: float | None = None,
+                   k_e: float = 0.0) -> tuple[Vec2, ...]:
+    """Pairwise Newtonian/Coulomb acceleration on every body, with optional 1PN general relativity."""
     count = len(bodies)
     ax = [0.0] * count
     ay = [0.0] * count
@@ -111,6 +113,13 @@ def _accelerations(bodies: Sequence[Body], g: float,
                 ay[i] += pull * second.mass * dy
                 ax[j] -= pull * first.mass * dx
                 ay[j] -= pull * first.mass * dy
+
+            if k_e != 0.0 and (first.charge != 0.0 or second.charge != 0.0):
+                coulomb_pull = k_e * (first.charge * second.charge) * inverse_r3
+                ax[i] -= (coulomb_pull / first.mass) * dx
+                ay[i] -= (coulomb_pull / first.mass) * dy
+                ax[j] += (coulomb_pull / second.mass) * dx
+                ay[j] += (coulomb_pull / second.mass) * dy
     return tuple(Vec2(ax[i], ay[i]) for i in range(count))
 
 
@@ -122,12 +131,15 @@ class World:
     g: float
     time: float = 0.0
     c: float | None = None
+    k_e: float = 0.0
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.g) or self.g <= 0.0:
             raise ValueError("the gravitational constant must be a positive finite number")
         if self.c is not None and (not math.isfinite(self.c) or self.c <= 0.0):
             raise ValueError("the speed of light must be a positive finite number")
+        if not math.isfinite(self.k_e) or self.k_e < 0.0:
+            raise ValueError("the Coulomb constant must be a non-negative finite number")
         if not self.bodies:
             raise ValueError("a world needs at least one body")
         names = set()
@@ -144,14 +156,14 @@ class World:
             raise ValueError("time must be finite")
 
     def accelerations(self) -> tuple[Vec2, ...]:
-        return _accelerations(self.bodies, self.g, self.c)
+        return _accelerations(self.bodies, self.g, self.c, self.k_e)
 
     def step(self, dt: float) -> None:
         """Advance one kick-drift-kick leapfrog step of length ``dt``."""
         if not math.isfinite(dt) or dt <= 0.0:
             raise ValueError("the time step must be a positive finite number")
         half = dt * 0.5
-        start = _accelerations(self.bodies, self.g, self.c)
+        start = _accelerations(self.bodies, self.g, self.c, self.k_e)
         drifted = tuple(
             replace(
                 body,
@@ -163,7 +175,7 @@ class World:
             )
             for body, acc in zip(self.bodies, start)
         )
-        end = _accelerations(drifted, self.g, self.c)
+        end = _accelerations(drifted, self.g, self.c, self.k_e)
         self.bodies = tuple(
             replace(body, vel=Vec2(body.vel.x + acc.x * half, body.vel.y + acc.y * half))
             for body, acc in zip(drifted, end)
@@ -195,6 +207,7 @@ class World:
                         vel=vel,
                         symbol=primary.symbol,
                         color=primary.color,
+                        charge=b1.charge + b2.charge,
                     )
                     events.append((primary.name, secondary.name, new_body.name))
                     bodies_list[i] = new_body
@@ -208,25 +221,64 @@ class World:
             self.bodies = tuple(bodies_list)
         return events
 
-    def advance(self, dt: float, steps: int, merge_radius: float = 0.0) -> list[tuple[str, str, str]]:
+    def resolve_elastic_collisions(self, bounce_radius: float = 0.01,
+                                   restitution: float = 1.0) -> list[tuple[str, str]]:
+        """Elastically bounce bodies closer than bounce_radius, conserving momentum."""
+        if bounce_radius <= 0.0 or len(self.bodies) <= 1:
+            return []
+        bodies_list = list(self.bodies)
+        events: list[tuple[str, str]] = []
+        for i in range(len(bodies_list) - 1):
+            for j in range(i + 1, len(bodies_list)):
+                b1 = bodies_list[i]
+                b2 = bodies_list[j]
+                delta = b1.pos - b2.pos
+                dist = delta.norm()
+                if 0.0 < dist <= bounce_radius:
+                    normal = delta / dist
+                    v_rel = b1.vel - b2.vel
+                    v_normal = v_rel.dot(normal)
+                    if v_normal < 0.0:
+                        e = max(0.0, min(1.0, restitution))
+                        impulse = -(1.0 + e) * v_normal / (1.0 / b1.mass + 1.0 / b2.mass)
+                        new_v1 = b1.vel + normal * (impulse / b1.mass)
+                        new_v2 = b2.vel - normal * (impulse / b2.mass)
+                        overlap = bounce_radius - dist
+                        total_m = b1.mass + b2.mass
+                        pos1 = b1.pos + normal * (overlap * (b2.mass / total_m))
+                        pos2 = b2.pos - normal * (overlap * (b1.mass / total_m))
+                        bodies_list[i] = replace(b1, pos=pos1, vel=new_v1)
+                        bodies_list[j] = replace(b2, pos=pos2, vel=new_v2)
+                        events.append((b1.name, b2.name))
+        if events:
+            self.bodies = tuple(bodies_list)
+        return events
+
+    def advance(self, dt: float, steps: int, merge_radius: float = 0.0,
+                bounce_radius: float = 0.0, restitution: float = 1.0) -> list[tuple[str, ...]]:
         if steps < 0:
             raise ValueError("steps cannot be negative")
-        events: list[tuple[str, str, str]] = []
+        events: list[tuple[str, ...]] = []
         for _ in range(steps):
             self.step(dt)
             if merge_radius > 0.0:
                 step_events = self.resolve_collisions(merge_radius)
                 if step_events:
                     events.extend(step_events)
+            if bounce_radius > 0.0:
+                bounce_events = self.resolve_elastic_collisions(bounce_radius, restitution)
+                if bounce_events:
+                    events.extend(bounce_events)
         return events
 
-    def advance_to(self, target: float, dt: float, merge_radius: float = 0.0) -> list[tuple[str, str, str]]:
+    def advance_to(self, target: float, dt: float, merge_radius: float = 0.0,
+                   bounce_radius: float = 0.0, restitution: float = 1.0) -> list[tuple[str, ...]]:
         """Integrate to ``target``, ending with a shorter step when needed."""
         if not math.isfinite(target):
             raise ValueError("the target time must be finite")
         if target < self.time - 1e-12:
             raise ValueError("cannot travel backwards in time")
-        events: list[tuple[str, str, str]] = []
+        events: list[tuple[str, ...]] = []
         while self.time < target - 1e-12:
             remaining = target - self.time
             self.step(dt if remaining > dt else remaining)
@@ -234,6 +286,10 @@ class World:
                 step_events = self.resolve_collisions(merge_radius)
                 if step_events:
                     events.extend(step_events)
+            if bounce_radius > 0.0:
+                bounce_events = self.resolve_elastic_collisions(bounce_radius, restitution)
+                if bounce_events:
+                    events.extend(bounce_events)
         return events
 
     @property
@@ -258,12 +314,49 @@ class World:
 
     def potential_energy(self) -> float:
         total = 0.0
-        for i in range(len(self.bodies) - 1):
-            for j in range(i + 1, len(self.bodies)):
-                separation = self.bodies[i].pos.distance_to(self.bodies[j].pos)
+        count = len(self.bodies)
+        for i in range(count - 1):
+            b1 = self.bodies[i]
+            for j in range(i + 1, count):
+                b2 = self.bodies[j]
+                separation = b1.pos.distance_to(b2.pos)
                 if separation > 0.0:
-                    total -= self.g * self.bodies[i].mass * self.bodies[j].mass / separation
+                    total -= self.g * b1.mass * b2.mass / separation
+                    if self.k_e != 0.0 and (b1.charge != 0.0 or b2.charge != 0.0):
+                        total += self.k_e * b1.charge * b2.charge / separation
         return total
+
+    def electrostatic_energy(self) -> float:
+        if self.k_e == 0.0:
+            return 0.0
+        total = 0.0
+        count = len(self.bodies)
+        for i in range(count - 1):
+            b1 = self.bodies[i]
+            for j in range(i + 1, count):
+                b2 = self.bodies[j]
+                separation = b1.pos.distance_to(b2.pos)
+                if separation > 0.0:
+                    total += self.k_e * b1.charge * b2.charge / separation
+        return total
+
+    def relativistic_energy(self) -> float | None:
+        """Total relativistic energy E = sum(gamma * m * c^2), or None if c is not set."""
+        if self.c is None or self.c <= 0.0:
+            return None
+        c2 = self.c * self.c
+        total = 0.0
+        for b in self.bodies:
+            beta2 = b.vel.norm_sq() / c2
+            gamma = 1.0 / math.sqrt(1.0 - beta2) if beta2 < 1.0 else 1.0
+            total += gamma * b.mass * c2
+        return total
+
+    def schwarzschild_radius(self) -> float | None:
+        """Schwarzschild radius r_s = 2 * G * M / c^2 of the system's total mass."""
+        if self.c is None or self.c <= 0.0:
+            return None
+        return 2.0 * self.g * self.total_mass / (self.c * self.c)
 
     def total_energy(self) -> float:
         return self.kinetic_energy() + self.potential_energy()

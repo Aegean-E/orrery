@@ -123,3 +123,20 @@ contract, a dependency, a data format or the architecture; IDs are consecutive a
   of 0.05, allowing users to make orbits almost exact geometric circles on any monitor and font.
 - **Consequences**: Users can dial in perfect circular orbit geometry and select circular dot markers
   with immediate HUD feedback (`asp=X.XX`, `dot=...`). Backward compatibility is fully preserved.
+
+
+### ADR-009: Elastic bounce collisions, Coulomb electrostatics, atomic scenarios, and relativistic energy metrics
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**: Inelastic coalescence was previously the only collision mode, destroying bodies on impact.
+  Users requested elastic bounce dynamics, atomic and electrostatic simulations, relativistic energy
+  decomposition, and atomic scenarios.
+- **Decision**: Add pairwise elastic collisions with restitution (`--bounce`, `--bounce-radius`,
+  `--restitution`), conserving linear momentum and barycentre through mass-weighted position push-out
+  and impulse exchange. Add Coulomb electrostatic force alongside gravity ($F_e = k_e q_1 q_2 / r^2$),
+  electrostatic potential energy, relativistic total energy $E = \sum \gamma m c^2$, Schwarzschild radius
+  $r_s = 2GM/c^2$, and live telemetry HUD decomposition ($K$, $U$, Virial metric $2K+U$). Implement
+  built-in atomic and relativistic scenarios: `rutherford` (alpha particle scattering against gold nucleus),
+  `bohr` (semi-classical planetary atom), and `black-hole` (relativistic singularity with rosette precession).
+- **Consequences**: Orrery models gravitational, relativistic, and subatomic electrostatic physics
+  seamlessly in a single zero-dependency engine with full CLI and export parity.

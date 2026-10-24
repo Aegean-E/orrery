@@ -8,9 +8,9 @@
 ## 📊 Codebase Metrics
 - **Total Python Modules**: `18`
 - **Total Classes**: `26`
-- **Total Top-Level Functions**: `63`
-- **Total Class Methods**: `149`
-- **Total Source Lines**: `3574`
+- **Total Top-Level Functions**: `67`
+- **Total Class Methods**: `166`
+- **Total Source Lines**: `4081`
 
 ---
 
@@ -33,7 +33,7 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `1124` lines (`47242` bytes)
+**Size**: `1244` lines (`53408` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
@@ -69,7 +69,8 @@
 - `def _cmd_info(args)`
 - `def _sparkline(values, width, *, ascii_only)` - *Render a compact sparkline trend string for a series of numeric samples.*
 - `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused, camera_label, fps, dot_char)`
-- `def _simulate(scenario, target, trail_limit, *, relativity, c_override, merge_radius)`
+- `def _validate_physics_args(args)`
+- `def _simulate(scenario, target, trail_limit, *, relativity, c_override, k_coulomb_override, merge_radius, bounce_radius, restitution)`
 - `def _cmd_snapshot(args)`
 - `def _enable_windows_ansi()` - *Enable VT processing when possible; return whether ANSI control is safe.*
 - `def _cmd_run(args)`
@@ -84,7 +85,7 @@
 ### [`orrery/custom.py`](orrery/custom.py)
 > *Load user-authored scenarios from JSON files.*
 
-**Size**: `226` lines (`9415` bytes)
+**Size**: `231` lines (`9640` bytes)
 
 **Classes:**
 - `class ScenarioFileError` - *A custom scenario could not be loaded; the CLI turns this into Error/Why/Fix.*
@@ -131,7 +132,7 @@
 ### [`orrery/scenarios.py`](orrery/scenarios.py)
 > *The built-in worlds.*
 
-**Size**: `403` lines (`14243` bytes)
+**Size**: `533` lines (`18771` bytes)
 
 **Classes:**
 - `class Scenario` - *A named initial state plus the knobs the player needs to present it.*
@@ -147,6 +148,9 @@
 - `def _trojans()`
 - `def _pythagorean()` - *The classic 3-4-5 three-body problem: rest, a close encounter, then ejection.*
 - `def _lagrange()` - *Lagrange's 1772 equilateral pinwheel: three equal masses in a rigid rotating triangle.*
+- `def _rutherford()` - *Rutherford alpha particle scattering against a heavy gold nucleus (+79e).*
+- `def _bohr()` - *Semi-classical Bohr atom: electrons in circular orbits around a central proton.*
+- `def _black_hole()` - *Relativistic black hole with high-velocity probes exhibiting 1PN orbital precession.*
 - `def scenario_keys()`
 - `def get_scenario(name)` - *Resolve a key or a forgiving alias; raise KeyError when nothing matches.*
 
@@ -155,7 +159,7 @@
 ### [`orrery/sim.py`](orrery/sim.py)
 > *Gravity, bodies and a symplectic leapfrog integrator.*
 
-**Size**: `307` lines (`11778` bytes)
+**Size**: `400` lines (`16194` bytes)
 
 **Classes:**
 - `class Vec2` - *A point or vector in the plane.*
@@ -169,26 +173,30 @@
   - Method `.norm_sq()`
   - Method `.norm()`
   - Method `.distance_to(other)`
-- `class Body` - *An immutable snapshot of one gravitating body.*
+- `class Body` - *An immutable snapshot of one gravitating/charged body.*
 - `class Orbit` - *Osculating elements of one body around a chosen primary, in world units.*
 - `class World` - *A mutable simulation clock over a tuple of immutable bodies.*
   - Method `.__post_init__()`
   - Method `.accelerations()`
   - Method `.step(dt)` - *Advance one kick-drift-kick leapfrog step of length ``dt``.*
   - Method `.resolve_collisions(merge_radius)` - *Inelastically merge bodies closer than merge_radius, conserving momentum.*
-  - Method `.advance(dt, steps, merge_radius)`
-  - Method `.advance_to(target, dt, merge_radius)` - *Integrate to ``target``, ending with a shorter step when needed.*
+  - Method `.resolve_elastic_collisions(bounce_radius, restitution)` - *Elastically bounce bodies closer than bounce_radius, conserving momentum.*
+  - Method `.advance(dt, steps, merge_radius, bounce_radius, restitution)`
+  - Method `.advance_to(target, dt, merge_radius, bounce_radius, restitution)` - *Integrate to ``target``, ending with a shorter step when needed.*
   - Property `.total_mass`
   - Method `.momentum()`
   - Method `.center_of_mass()`
   - Method `.kinetic_energy()`
   - Method `.potential_energy()`
+  - Method `.electrostatic_energy()`
+  - Method `.relativistic_energy()` - *Total relativistic energy E = sum(gamma * m * c^2), or None if c is not set.*
+  - Method `.schwarzschild_radius()` - *Schwarzschild radius r_s = 2 * G * M / c^2 of the system's total mass.*
   - Method `.total_energy()`
   - Method `.angular_momentum()`
   - Method `.energy_drift(initial_energy)`
 
 **Functions:**
-- `def _accelerations(bodies, g, c)` - *Pairwise Newtonian acceleration on every body, with optional 1PN general relativity.*
+- `def _accelerations(bodies, g, c, k_e)` - *Pairwise Newtonian/Coulomb acceleration on every body, with optional 1PN general relativity.*
 - `def orbital_elements(primary, body, g)` - *Osculating semi-major axis, eccentricity and period of ``body`` around ``primary``.*
 
 ---
@@ -196,7 +204,7 @@
 ### [`orrery/trails.py`](orrery/trails.py)
 > *Bounded, sampled position history for drawing orbit trails.*
 
-**Size**: `88` lines (`3498` bytes)
+**Size**: `100` lines (`4116` bytes)
 
 **Classes:**
 - `class TrailRecorder` - *Keep one bounded deque of past positions per body, sampled every N steps.*
@@ -205,8 +213,8 @@
   - Method `.sync(world)` - *Synchronize trail history buffers when the world body count changes.*
   - Method `.record(world)`
   - Method `.clear(world)` - *Clear historical trail samples, seeding with current positions if world is given.*
-  - Method `.advance(world, dt, steps, every, merge_radius)`
-  - Method `.advance_to(world, target, dt, every, merge_radius)`
+  - Method `.advance(world, dt, steps, every, merge_radius, bounce_radius, restitution)`
+  - Method `.advance_to(world, target, dt, every, merge_radius, bounce_radius, restitution)`
 
 ---
 
@@ -216,7 +224,7 @@
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `402` lines (`18623` bytes)
+**Size**: `449` lines (`20876` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -262,6 +270,11 @@
   - Method `.test_compose_frame_fps_and_step_hint()`
   - Method `.test_cli_dot_option_snapshot()`
   - Method `.test_run_interactive_aspect_and_dot_cycling()`
+  - Method `.test_cli_bounce_and_restitution_options()`
+  - Method `.test_cli_coulomb_option()`
+  - Method `.test_cli_telemetry_hud_energy_decomposition()`
+  - Method `.test_cli_invalid_physics_args_rejected()`
+  - Method `.test_cli_export_metadata_includes_bounce_and_coulomb()`
 
 **Functions:**
 - `def run_cli(*argv)`
@@ -269,7 +282,7 @@
 ---
 
 ### [`tests/test_custom.py`](tests/test_custom.py)
-**Size**: `141` lines (`5171` bytes)
+**Size**: `151` lines (`5614` bytes)
 
 **Classes:**
 - `class CustomScenarioTests`
@@ -286,6 +299,7 @@
   - Method `.test_body_outside_extent_is_rejected()`
   - Method `.test_control_text_and_unknown_colours_are_rejected()`
   - Method `.test_body_limit_is_enforced()`
+  - Method `.test_custom_scenario_with_charge_and_coulomb()`
 
 **Functions:**
 - `def run_cli(*argv)`
@@ -354,23 +368,26 @@
 ---
 
 ### [`tests/test_scenarios.py`](tests/test_scenarios.py)
-**Size**: `93` lines (`4154` bytes)
+**Size**: `124` lines (`5615` bytes)
 
 **Classes:**
 - `class ScenarioTests`
-  - Method `.test_exactly_six_distinct_scenarios()`
+  - Method `.test_distinct_scenarios()`
   - Method `.test_lagrange_pinwheel_is_equilateral()`
   - Method `.test_every_scenario_is_valid_and_centred()`
   - Method `.test_solar_earth_has_its_real_orbit()`
   - Method `.test_trojan_asteroids_straddle_jupiter()`
   - Method `.test_aliases_resolve()`
+  - Method `.test_rutherford_scenario()`
+  - Method `.test_bohr_scenario()`
+  - Method `.test_black_hole_scenario()`
   - Method `.test_extents_cover_the_initial_bodies()`
   - Method `.test_unknown_key_raises()`
 
 ---
 
 ### [`tests/test_sim.py`](tests/test_sim.py)
-**Size**: `168` lines (`7993` bytes)
+**Size**: `227` lines (`11146` bytes)
 
 **Classes:**
 - `class Vec2Tests`
@@ -387,6 +404,10 @@
   - Method `.test_resolve_collisions_inelastic_merger()`
   - Method `.test_advance_and_advance_to_with_merge_radius()`
   - Method `.test_invalid_inputs_are_rejected()`
+  - Method `.test_coulomb_repulsion_and_attraction()`
+  - Method `.test_electrostatic_energy_and_potential()`
+  - Method `.test_relativistic_energy_and_schwarzschild_radius()`
+  - Method `.test_elastic_bounce_collisions_conservation()`
 
 ---
 

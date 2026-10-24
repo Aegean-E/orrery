@@ -11,12 +11,13 @@ from orrery.sim import World, orbital_elements
 
 
 class ScenarioTests(unittest.TestCase):
-    def test_exactly_six_distinct_scenarios(self):
+    def test_distinct_scenarios(self):
         self.assertEqual(
             scenario_keys(),
-            ("solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange"),
+            ("solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange",
+             "rutherford", "bohr", "black-hole"),
         )
-        self.assertEqual(len(set(scenario_keys())), 6)
+        self.assertEqual(len(set(scenario_keys())), 9)
 
     def test_lagrange_pinwheel_is_equilateral(self):
         scenario = get_scenario("lagrange")
@@ -76,6 +77,36 @@ class ScenarioTests(unittest.TestCase):
             self.assertEqual(get_scenario(name).key, "figure-eight")
         self.assertEqual(get_scenario("circumbinary").key, "binary")
         self.assertEqual(get_scenario("trojan").key, "trojans")
+        self.assertEqual(get_scenario("gold-foil").key, "rutherford")
+        self.assertEqual(get_scenario("atom").key, "bohr")
+        self.assertEqual(get_scenario("singularity").key, "black-hole")
+        self.assertEqual(get_scenario("bh").key, "black-hole")
+
+    def test_rutherford_scenario(self):
+        scenario = get_scenario("rutherford")
+        self.assertEqual(scenario.k_e, 0.1)
+        nucleus = next(b for b in scenario.bodies if b.name == "Gold")
+        self.assertEqual(nucleus.charge, 79.0)
+        alphas = [b for b in scenario.bodies if "Alpha" in b.name]
+        self.assertEqual(len(alphas), 3)
+        self.assertTrue(all(a.charge == 2.0 for a in alphas))
+
+    def test_bohr_scenario(self):
+        scenario = get_scenario("bohr")
+        self.assertEqual(scenario.k_e, 0.01)
+        proton = next(b for b in scenario.bodies if b.name == "Proton")
+        self.assertEqual(proton.charge, 1.0)
+        electrons = [b for b in scenario.bodies if "Electron" in b.name]
+        self.assertEqual(len(electrons), 2)
+        self.assertTrue(all(e.charge == -1.0 for e in electrons))
+
+    def test_black_hole_scenario(self):
+        scenario = get_scenario("black-hole")
+        self.assertEqual(scenario.c, 20.0)
+        world = World(scenario.bodies, scenario.g, c=scenario.c)
+        rs = world.schwarzschild_radius()
+        self.assertIsNotNone(rs)
+        self.assertAlmostEqual(rs, 0.20, places=3)
 
     def test_extents_cover_the_initial_bodies(self):
         for scenario in SCENARIOS.values():

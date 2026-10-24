@@ -23,7 +23,8 @@ class ListAndInfoTests(unittest.TestCase):
     def test_list_shows_every_scenario(self):
         code, output = run_cli("list")
         self.assertEqual(code, 0)
-        for key in ("solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange"):
+        for key in ("solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange",
+                    "rutherford", "bohr", "black-hole"):
             self.assertIn(key, output)
 
     def test_list_json_is_a_machine_readable_catalogue(self):
@@ -31,7 +32,8 @@ class ListAndInfoTests(unittest.TestCase):
         self.assertEqual(code, 0)
         catalogue = json.loads(output)
         self.assertEqual([entry["key"] for entry in catalogue],
-                         ["solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange"])
+                         ["solar", "figure-eight", "binary", "trojans", "pythagorean", "lagrange",
+                          "rutherford", "bohr", "black-hole"])
         self.assertEqual(catalogue[0]["units"]["distance"], "AU")
         self.assertEqual(catalogue[0]["extent"], [1.75, 1.7])
 
@@ -396,6 +398,51 @@ class InteractiveAndTelemetryTests(unittest.TestCase):
                                            "--ascii", "--no-color")
                     self.assertEqual(code, 0)
                     self.assertIn("Stopped at t =", output)
+
+    def test_cli_bounce_and_restitution_options(self):
+        code, output = run_cli("snapshot", "solar", "--bounce", "--bounce-radius", "0.05",
+                               "--restitution", "0.9", "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertIn("ORRERY |", output)
+
+    def test_cli_coulomb_option(self):
+        code, output = run_cli("snapshot", "rutherford", "--k-coulomb", "0.2",
+                               "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertIn("ORRERY |", output)
+
+    def test_cli_telemetry_hud_energy_decomposition(self):
+        code, output = run_cli("snapshot", "solar", "--telemetry", "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertIn("K:", output)
+        self.assertIn("U:", output)
+        self.assertIn("2K+U:", output)
+
+    def test_cli_invalid_physics_args_rejected(self):
+        code, output = run_cli("snapshot", "solar", "--restitution", "1.5")
+        self.assertEqual(code, 2)
+        self.assertIn("--restitution", output)
+
+        code, output = run_cli("snapshot", "solar", "--bounce-radius", "-0.1")
+        self.assertEqual(code, 2)
+        self.assertIn("--bounce-radius", output)
+
+        code, output = run_cli("snapshot", "solar", "--k-coulomb", "-1.0")
+        self.assertEqual(code, 2)
+        self.assertIn("--k-coulomb", output)
+
+    def test_cli_export_metadata_includes_bounce_and_coulomb(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out_file = Path(temp_dir) / "export.json"
+            code, output = run_cli("export", "rutherford", "--out", str(out_file),
+                                   "--format", "json", "--bounce", "--restitution", "0.85",
+                                   "--k-coulomb", "0.25")
+            self.assertEqual(code, 0)
+            data = json.loads(out_file.read_text(encoding="utf-8"))
+            export_meta = data["scenario"]["export"]
+            self.assertEqual(export_meta["k_e"], 0.25)
+            self.assertEqual(export_meta["bounce_radius"], 0.05)
+            self.assertEqual(export_meta["restitution"], 0.85)
 
 
 if __name__ == "__main__":

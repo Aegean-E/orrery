@@ -47,12 +47,14 @@ class TrailRecorder:
                 trail.append(world.bodies[index].pos)
 
     def advance(self, world: World, dt: float, steps: int, every: int = 1,
-                merge_radius: float = 0.0) -> list[tuple[str, str, str]]:
+                merge_radius: float = 0.0,
+                bounce_radius: float = 0.0,
+                restitution: float = 1.0) -> list[tuple[str, ...]]:
         if steps < 0:
             raise ValueError("steps cannot be negative")
         if every < 1:
             raise ValueError("the sampling interval must be at least one step")
-        collisions = []
+        collisions: list[tuple[str, ...]] = []
         for _ in range(steps):
             world.step(dt)
             if merge_radius > 0.0:
@@ -60,20 +62,26 @@ class TrailRecorder:
                 if events:
                     collisions.extend(events)
                     self.sync(world)
+            if bounce_radius > 0.0:
+                bounce_events = world.resolve_elastic_collisions(bounce_radius, restitution)
+                if bounce_events:
+                    collisions.extend(bounce_events)
             self._steps += 1
             if self._steps % every == 0:
                 self.record(world)
         return collisions
 
     def advance_to(self, world: World, target: float, dt: float, every: int = 1,
-                   merge_radius: float = 0.0) -> list[tuple[str, str, str]]:
+                   merge_radius: float = 0.0,
+                   bounce_radius: float = 0.0,
+                   restitution: float = 1.0) -> list[tuple[str, ...]]:
         if not math.isfinite(target):
             raise ValueError("the target time must be finite")
         if target < world.time - 1e-12:
             raise ValueError("cannot travel backwards in time")
         if every < 1:
             raise ValueError("the sampling interval must be at least one step")
-        collisions: list[tuple[str, str, str]] = []
+        collisions: list[tuple[str, ...]] = []
         while world.time < target - 1e-12:
             remaining = target - world.time
             world.step(dt if remaining > dt else remaining)
@@ -82,6 +90,10 @@ class TrailRecorder:
                 if events:
                     collisions.extend(events)
                     self.sync(world)
+            if bounce_radius > 0.0:
+                bounce_events = world.resolve_elastic_collisions(bounce_radius, restitution)
+                if bounce_events:
+                    collisions.extend(bounce_events)
             self._steps += 1
             if self._steps % every == 0:
                 self.record(world)

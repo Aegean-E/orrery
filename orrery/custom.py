@@ -101,8 +101,9 @@ def _body(raw: Any, index: int) -> Body:
             "the palette is fixed so colour output stays portable.",
             f"use one of: {', '.join(sorted(ANSI))}.",
         )
+    charge = _number(raw.get("charge", 0.0), f"bodies[{index}].charge")
     return Body(name=name, mass=mass, pos=position, vel=velocity,
-                symbol=symbol, color=color)
+                symbol=symbol, color=color, charge=charge)
 
 
 def _units(raw: Any) -> tuple[str, str, str, str, float]:
@@ -196,6 +197,9 @@ def load_scenario_file(path_like: str | Path) -> Scenario:
         positive=True,
     )
     c = _number(data["c"], "c", positive=True) if "c" in data and data["c"] is not None else None
+    k_e = _number(data.get("k_e", 0.0), "k_e")
+    if k_e < 0.0:
+        _fail("k_e must be a non-negative number.")
 
     try:
         return Scenario(
@@ -218,6 +222,7 @@ def load_scenario_file(path_like: str | Path) -> Scenario:
             speed_unit=speed_unit,
             speed_scale=speed_scale,
             c=c,
+            k_e=k_e,
         )
     except ValueError as error:
         _fail(

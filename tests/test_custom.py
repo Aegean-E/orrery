@@ -136,6 +136,16 @@ class CustomScenarioTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("1-64 entries", output)
 
+    def test_custom_scenario_with_charge_and_coulomb(self):
+        payload = copy.deepcopy(self.base)
+        payload["k_e"] = 2.5
+        payload["bodies"][0]["charge"] = 1.0
+        payload["bodies"][1]["charge"] = -1.0
+        scenario = load_scenario_file(self._write(payload))
+        self.assertEqual(scenario.k_e, 2.5)
+        self.assertEqual(scenario.bodies[0].charge, 1.0)
+        self.assertEqual(scenario.bodies[1].charge, -1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

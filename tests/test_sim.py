@@ -162,6 +162,65 @@ class WorldTests(unittest.TestCase):
             World((body,), 1.0, c=0.0)
         with self.assertRaises(ValueError):
             World((body,), 1.0, c=-5.0)
+        with self.assertRaises(ValueError):
+            World((body,), 1.0, k_e=-1.0)
+
+    def test_coulomb_repulsion_and_attraction(self):
+        # Two like charges repel
+        p1 = Body("P1", 1.0, Vec2(0.0, 0.0), Vec2(), charge=1.0)
+        p2 = Body("P2", 1.0, Vec2(2.0, 0.0), Vec2(), charge=2.0)
+        world_repel = World((p1, p2), 1e-9, k_e=4.0)
+        acc_repel = world_repel.accelerations()
+        # Coulomb force magnitude: k_e * q1 * q2 / r^2 = 4.0 * 2.0 / 4.0 = 2.0
+        # p1 pushed left (negative x), p2 pushed right (positive x)
+        self.assertAlmostEqual(acc_repel[0].x, -2.0, places=5)
+        self.assertAlmostEqual(acc_repel[1].x, 2.0, places=5)
+
+        # Opposite charges attract
+        e2 = Body("E2", 1.0, Vec2(2.0, 0.0), Vec2(), charge=-2.0)
+        world_attract = World((p1, e2), 1e-9, k_e=4.0)
+        acc_attract = world_attract.accelerations()
+        # p1 pulled right (positive x), e2 pulled left (negative x)
+        self.assertAlmostEqual(acc_attract[0].x, 2.0, places=5)
+        self.assertAlmostEqual(acc_attract[1].x, -2.0, places=5)
+
+    def test_electrostatic_energy_and_potential(self):
+        p1 = Body("P1", 1.0, Vec2(0.0, 0.0), Vec2(), charge=2.0)
+        p2 = Body("P2", 1.0, Vec2(2.0, 0.0), Vec2(), charge=3.0)
+        world = World((p1, p2), g=1.0, k_e=5.0)
+        # U_g = - 1.0 * 1.0 * 1.0 / 2.0 = -0.5
+        # U_e = 5.0 * 2.0 * 3.0 / 2.0 = 15.0
+        # U_tot = -0.5 + 15.0 = 14.5
+        self.assertAlmostEqual(world.electrostatic_energy(), 15.0, places=6)
+        self.assertAlmostEqual(world.potential_energy(), 14.5, places=6)
+
+    def test_relativistic_energy_and_schwarzschild_radius(self):
+        b1 = Body("B1", 10.0, Vec2(0.0, 0.0), Vec2(3.0, 0.0))
+        world = World((b1,), g=2.0, c=5.0)
+        # r_s = 2 * G * M / c^2 = 2 * 2.0 * 10.0 / 25.0 = 1.6
+        self.assertAlmostEqual(world.schwarzschild_radius(), 1.6, places=6)
+        # beta = v / c = 3.0 / 5.0 = 0.6
+        # gamma = 1 / sqrt(1 - 0.36) = 1 / 0.8 = 1.25
+        # E_rel = gamma * m * c^2 = 1.25 * 10.0 * 25.0 = 312.5
+        self.assertAlmostEqual(world.relativistic_energy(), 312.5, places=5)
+
+    def test_elastic_bounce_collisions_conservation(self):
+        b1 = Body("Left", 2.0, Vec2(-0.01, 0.0), Vec2(2.0, 0.0), "L")
+        b2 = Body("Right", 2.0, Vec2(0.01, 0.0), Vec2(-2.0, 0.0), "R")
+        world = World((b1, b2), g=1e-9)
+        k0 = world.kinetic_energy()
+        p0 = world.momentum()
+        cm0 = world.center_of_mass()
+        events = world.resolve_elastic_collisions(bounce_radius=0.05, restitution=1.0)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0], ("Left", "Right"))
+        # Equal masses head-on bounce: velocities swap
+        self.assertAlmostEqual(world.bodies[0].vel.x, -2.0, places=5)
+        self.assertAlmostEqual(world.bodies[1].vel.x, 2.0, places=5)
+        # Exact kinetic energy and momentum conservation
+        self.assertAlmostEqual(world.kinetic_energy(), k0, places=6)
+        self.assertAlmostEqual(world.momentum().distance_to(p0), 0.0, places=6)
+        self.assertAlmostEqual(world.center_of_mass().distance_to(cm0), 0.0, places=6)
 
 
 if __name__ == "__main__":
