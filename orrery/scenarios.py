@@ -27,6 +27,7 @@ class Scenario:
     g: float
     dt: float
     span: float
+    extent: tuple[float, float]
     bodies: tuple[Body, ...]
     steps_per_frame: int
     trail_length: int
@@ -48,8 +49,17 @@ class Scenario:
             raise ValueError(f"scenario '{self.key}' needs a positive finite time step")
         if not math.isfinite(self.span) or self.span <= 0.0:
             raise ValueError(f"scenario '{self.key}' needs a positive finite view span")
+        if len(self.extent) != 2 or not all(
+            math.isfinite(value) and value > 0.0 for value in self.extent
+        ):
+            raise ValueError(f"scenario '{self.key}' needs two positive view extents")
         if not self.bodies:
             raise ValueError(f"scenario '{self.key}' needs at least one body")
+        for body in self.bodies:
+            if abs(body.pos.x) > self.extent[0] or abs(body.pos.y) > self.extent[1]:
+                raise ValueError(
+                    f"scenario '{self.key}' body '{body.name}' lies outside its extent"
+                )
         names = set()
         symbols = set()
         for body in self.bodies:
@@ -128,9 +138,10 @@ def _solar() -> Scenario:
         g=G_SOLAR,
         dt=0.2,
         span=3.6,
+        extent=(1.75, 1.70),
         bodies=_center_and_zero_momentum((sun, *planets)),
         steps_per_frame=8,
-        trail_length=1200,
+        trail_length=2000,
         record_every=1,
         default_frames=220,
         export_until=YEAR_DAYS,
@@ -163,10 +174,11 @@ def _figure_eight() -> Scenario:
         g=1.0,
         dt=0.001,
         span=1.3,
+        extent=(1.0, 0.30),
         bodies=bodies,
         steps_per_frame=20,
-        trail_length=2400,
-        record_every=2,
+        trail_length=4800,
+        record_every=1,
         default_frames=320,
         export_until=6.32591398,
         time_unit="t",
@@ -203,10 +215,11 @@ def _binary() -> Scenario:
         g=G_SOLAR,
         dt=0.01,
         span=3.6,
+        extent=(1.40, 1.40),
         bodies=_center_and_zero_momentum(bodies),
         steps_per_frame=80,
-        trail_length=1600,
-        record_every=4,
+        trail_length=6400,
+        record_every=1,
         default_frames=160,
         export_until=YEAR_DAYS,
         time_unit="d",
@@ -253,10 +266,11 @@ def _trojans() -> Scenario:
         g=G_SOLAR,
         dt=0.5,
         span=13.0,
+        extent=(5.40, 4.70),
         bodies=_center_and_zero_momentum(tuple(bodies)),
         steps_per_frame=5,
-        trail_length=800,
-        record_every=2,
+        trail_length=1600,
+        record_every=1,
         default_frames=220,
         export_until=YEAR_DAYS,
         time_unit="d",
@@ -267,21 +281,64 @@ def _trojans() -> Scenario:
     )
 
 
+def _pythagorean() -> Scenario:
+    """The classic 3-4-5 three-body problem: rest, a close encounter, then ejection."""
+    bodies = (
+        Body("Three", 3.0, Vec2(1.0, 3.0), Vec2(), "3", "cyan"),
+        Body("Four", 4.0, Vec2(-2.0, -1.0), Vec2(), "4", "magenta"),
+        Body("Five", 5.0, Vec2(1.0, -1.0), Vec2(), "5", "yellow"),
+    )
+    return Scenario(
+        key="pythagorean",
+        title="Pythagorean Chaos",
+        description=(
+            "The classic 3-4-5 three-body problem: three masses at rest at the corners of a "
+            "right triangle. Their first close encounter is chaotic and slings two of them "
+            "outward. The small time step resolves the encounter."
+        ),
+        g=1.0,
+        dt=0.0001,
+        span=10.0,
+        extent=(5.0, 5.0),
+        bodies=_center_and_zero_momentum(bodies),
+        steps_per_frame=100,
+        trail_length=10000,
+        record_every=2,
+        default_frames=220,
+        export_until=2.2,
+        time_unit="t",
+        distance_unit="u",
+        mass_unit="m",
+        speed_unit="u/t",
+        speed_scale=1.0,
+    )
+
+
 SCENARIOS: dict[str, Scenario] = {
     scenario.key: scenario
-    for scenario in (_solar(), _figure_eight(), _binary(), _trojans())
+    for scenario in (
+        _solar(),
+        _figure_eight(),
+        _binary(),
+        _trojans(),
+        _pythagorean(),
+    )
 }
 
 _ALIASES = {
     "inner": "solar",
     "solar-system": "solar",
     "inner-solar-system": "solar",
+    "figure-8": "figure-eight",
     "figure8": "figure-eight",
     "eight": "figure-eight",
     "three-body": "figure-eight",
     "circumbinary": "binary",
     "trojan": "trojans",
     "jupiter-trojans": "trojans",
+    "pythagoras": "pythagorean",
+    "chaos": "pythagorean",
+    "three-four-five": "pythagorean",
 }
 
 

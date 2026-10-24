@@ -44,6 +44,8 @@ class TrailRecorderTests(unittest.TestCase):
             recorder.advance(world, 1.0, 1, every=0)
         with self.assertRaises(ValueError):
             recorder.advance_to(world, 1.0, 1.0, every=0)
+        with self.assertRaises(ValueError):
+            recorder.advance_to(world, -1.0, 1.0)
 
 
 if __name__ == "__main__":

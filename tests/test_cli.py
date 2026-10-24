@@ -5,8 +5,11 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
-from orrery.cli import main
+from orrery.cli import _viewport, main
+from orrery.scenarios import SCENARIOS
+from orrery.sim import World
 
 
 def run_cli(*argv):
@@ -20,8 +23,17 @@ class ListAndInfoTests(unittest.TestCase):
     def test_list_shows_every_scenario(self):
         code, output = run_cli("list")
         self.assertEqual(code, 0)
-        for key in ("solar", "figure-eight", "binary", "trojans"):
+        for key in ("solar", "figure-eight", "binary", "trojans", "pythagorean"):
             self.assertIn(key, output)
+
+    def test_list_json_is_a_machine_readable_catalogue(self):
+        code, output = run_cli("list", "--json")
+        self.assertEqual(code, 0)
+        catalogue = json.loads(output)
+        self.assertEqual([entry["key"] for entry in catalogue],
+                         ["solar", "figure-eight", "binary", "trojans", "pythagorean"])
+        self.assertEqual(catalogue[0]["units"]["distance"], "AU")
+        self.assertEqual(catalogue[0]["extent"], [1.75, 1.7])
 
     def test_info_prints_a_table(self):
         code, output = run_cli("info", "solar")
@@ -84,6 +96,54 @@ class SnapshotTests(unittest.TestCase):
         self.assertIn("Why:", output)
         self.assertIn("Fix:", output)
 
+    def test_narrow_snapshot_never_exceeds_width(self):
+        code, output = run_cli("snapshot", "trojans", "--width", "20", "--height", "8",
+                               "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        lines = output.rstrip("\n").splitlines()
+        self.assertTrue(lines)
+        for line in lines:
+            self.assertLessEqual(len(line), 20, line)
+
+    def test_braille_is_default_and_can_be_disabled(self):
+        code, output = run_cli("snapshot", "solar", "--at", "30", "--width", "40",
+                               "--height", "12", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertTrue(any(0x2800 <= ord(char) <= 0x28FF for char in output))
+        code, output = run_cli("snapshot", "solar", "--at", "30", "--width", "40",
+                               "--height", "12", "--no-color", "--no-braille")
+        self.assertEqual(code, 0)
+        self.assertFalse(any(0x2800 <= ord(char) <= 0x28FF for char in output))
+
+    def test_aspect_can_be_overridden_and_is_validated(self):
+        code, _ = run_cli("snapshot", "solar", "--aspect", "0.5", "--width", "40",
+                          "--height", "12", "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        code, output = run_cli("snapshot", "solar", "--aspect", "0.01", "--width", "40",
+                               "--height", "12", "--ascii", "--no-color")
+        self.assertEqual(code, 2)
+        self.assertIn("--aspect 0.01", output)
+
+    def test_all_scenarios_are_visible_at_minimum_size(self):
+        for scenario in SCENARIOS.values():
+            world = World(scenario.bodies, scenario.g)
+            viewport = _viewport(scenario, 20, 8)
+            with self.subTest(scenario=scenario.key):
+                self.assertTrue(
+                    all(viewport.cell(body.pos) is not None for body in world.bodies)
+                )
+
+    def test_snapshot_step_budget_can_be_overridden(self):
+        with mock.patch("orrery.cli.SNAPSHOT_STEP_LIMIT", 10):
+            code, output = run_cli("snapshot", "solar", "--at", "100",
+                                   "--width", "40", "--height", "12", "--ascii")
+            self.assertEqual(code, 2)
+            self.assertIn("--force", output)
+            code, output = run_cli("snapshot", "solar", "--at", "100", "--force",
+                                   "--width", "40", "--height", "12", "--ascii")
+            self.assertEqual(code, 0)
+            self.assertIn("t = 100.00 d", output)
+
     def test_bad_width_is_refused(self):
         code, output = run_cli("snapshot", "solar", "--width", "5")
         self.assertEqual(code, 2)
@@ -104,6 +164,19 @@ class RunTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("ORRERY | Inner Solar System", output)
         self.assertIn("t = 1.60 d", output)
+
+    def test_frame_rate_range_is_enforced(self):
+        for fps in ("0.01", "500"):
+            code, output = run_cli("run", "solar", "--frames", "1", "--fps", fps,
+                                   "--width", "40", "--height", "12", "--ascii")
+            self.assertEqual(code, 2, fps)
+            self.assertIn("outside the supported range", output)
+
+    def test_piped_run_defaults_to_one_frame(self):
+        code, output = run_cli("run", "solar", "--width", "40", "--height", "12",
+                               "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertEqual(output.count("ORRERY | Inner Solar System"), 1)
 
 
 class ExportTests(unittest.TestCase):
@@ -129,6 +202,44 @@ class ExportTests(unittest.TestCase):
             code, output = run_cli("export", "solar", "--out", str(target))
             self.assertEqual(code, 2)
             self.assertIn("does not exist", output)
+
+    def test_overflowing_export_window_is_a_friendly_error(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "overflow.csv"
+            code, output = run_cli("export", "solar", "--out", str(target),
+                                   "--until", "1", "--every", "5e-324")
+            self.assertEqual(code, 2)
+            self.assertIn("export window is too large", output)
+            self.assertIn("Error:", output)
+            self.assertNotIn("Traceback", output)
+
+    def test_export_json_contains_metadata_and_samples(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "solar.json"
+            code, output = run_cli("export", "solar", "--out", str(target),
+                                   "--until", "1", "--every", "2", "--format", "json")
+            self.assertEqual(code, 0)
+            self.assertIn("(json)", output)
+            payload = json.loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(payload["scenario"]["key"], "solar")
+            self.assertEqual(payload["scenario"]["units"]["distance"], "AU")
+            self.assertEqual(payload["scenario"]["export"]["samples"], 2)
+            self.assertEqual(len(payload["samples"]), 2)
+            self.assertEqual([sample["time"] for sample in payload["samples"]], [0.0, 1.0])
+            self.assertEqual(payload["samples"][0]["bodies"][0]["name"], "Sun")
+            self.assertEqual(len(payload["samples"][0]["bodies"]), 5)
+
+    def test_export_always_includes_the_final_state(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "final.csv"
+            code, output = run_cli("export", "solar", "--out", str(target),
+                                   "--until", "1", "--every", "2")
+            self.assertEqual(code, 0)
+            self.assertIn("2 samples", output)
+            with target.open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.reader(handle))
+            self.assertEqual(len(rows), 1 + 2 * 5)
+            self.assertEqual(sorted({row[0] for row in rows[1:]}), ["0", "1"])
 
 
 if __name__ == "__main__":

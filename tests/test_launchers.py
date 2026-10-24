@@ -32,6 +32,11 @@ class LauncherTest(unittest.TestCase):
             self.assertIn("3.10", text)
             self.assertIn("-m orrery run", text)
 
+    def test_batch_checks_each_python_candidate(self):
+        batch = BATCH.read_text(encoding="utf-8")
+        self.assertIn("py -3 -c", batch)
+        self.assertIn("python -c", batch)
+
     def test_batch_failure_stays_visible(self):
         self.assertIn("pause", BATCH.read_text(encoding="utf-8").lower())
 

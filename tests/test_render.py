@@ -17,6 +17,10 @@ class ViewportTests(unittest.TestCase):
         viewport = Viewport(81, 25, 2.4)
         self.assertAlmostEqual(viewport.cols_per_unit, 2.0 * viewport.rows_per_unit)
 
+    def test_custom_aspect_changes_column_density(self):
+        viewport = Viewport(41, 21, 2.0, aspect=1.0)
+        self.assertAlmostEqual(viewport.cols_per_unit, viewport.rows_per_unit)
+
     def test_off_screen_points_are_none(self):
         viewport = Viewport(41, 21, 2.0)
         self.assertIsNone(viewport.cell(Vec2(1.2, 0.0)))
@@ -29,6 +33,8 @@ class ViewportTests(unittest.TestCase):
             Viewport(41, 2, 2.0)
         with self.assertRaises(ValueError):
             Viewport(41, 21, 0.0)
+        with self.assertRaises(ValueError):
+            Viewport(41, 21, 2.0, aspect=0.0)
 
 
 class RenderSceneTests(unittest.TestCase):
@@ -59,7 +65,23 @@ class RenderSceneTests(unittest.TestCase):
         plain = render_scene(self.world, self.trails, self.viewport)
         coloured = render_scene(self.world, self.trails, self.viewport, color=True)
         self.assertTrue(any("\x1b[" in line for line in coloured))
+        self.assertIn("\x1b[2;33m", "".join(coloured))
         self.assertEqual([strip_ansi(line) for line in coloured], plain)
+
+    def test_trail_samples_are_connected_with_line_cells(self):
+        world = World((Body("Probe", 1.0, Vec2(0.0, 0.9), Vec2(), "P"),), 1.0)
+        trails = [[Vec2(-0.5, 0.0), Vec2(0.5, 0.0)]]
+        lines = render_scene(world, trails, self.viewport, ascii_only=True)
+        self.assertTrue(all(lines[10][column] == "." for column in range(10, 31)))
+
+    def test_braille_trails_use_subcell_glyphs(self):
+        world = World((Body("Probe", 1.0, Vec2(0.0, 0.9), Vec2(), "P"),), 1.0)
+        trails = [[Vec2(-0.5, 0.0), Vec2(0.5, 0.0)]]
+        lines = render_scene(world, trails, self.viewport, braille=True)
+        flat = "".join(lines)
+        self.assertTrue(any(0x2800 <= ord(char) <= 0x28FF for char in flat))
+        self.assertEqual(len(lines), 21)
+        self.assertTrue(all(len(line) == 41 for line in lines))
 
     def test_trail_count_must_match_bodies(self):
         with self.assertRaises(ValueError):

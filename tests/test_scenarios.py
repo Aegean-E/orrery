@@ -11,9 +11,12 @@ from orrery.sim import World, orbital_elements
 
 
 class ScenarioTests(unittest.TestCase):
-    def test_exactly_four_distinct_scenarios(self):
-        self.assertEqual(scenario_keys(), ("solar", "figure-eight", "binary", "trojans"))
-        self.assertEqual(len(set(scenario_keys())), 4)
+    def test_exactly_five_distinct_scenarios(self):
+        self.assertEqual(
+            scenario_keys(),
+            ("solar", "figure-eight", "binary", "trojans", "pythagorean"),
+        )
+        self.assertEqual(len(set(scenario_keys())), 5)
 
     def test_every_scenario_is_valid_and_centred(self):
         for scenario in SCENARIOS.values():
@@ -24,7 +27,9 @@ class ScenarioTests(unittest.TestCase):
                 self.assertGreater(scenario.steps_per_frame, 0)
                 self.assertGreater(scenario.trail_length, 0)
                 self.assertLess(world.center_of_mass().norm(), 1e-12)
-                scale = world.total_mass * max(body.vel.norm() for body in world.bodies)
+                scale = max(1.0, world.total_mass * max(
+                    body.vel.norm() for body in world.bodies
+                ))
                 self.assertLess(world.momentum().norm(), 1e-12 * scale)
 
     def test_solar_earth_has_its_real_orbit(self):
@@ -58,9 +63,17 @@ class ScenarioTests(unittest.TestCase):
 
     def test_aliases_resolve(self):
         self.assertEqual(get_scenario("inner").key, "solar")
-        self.assertEqual(get_scenario("Figure8").key, "figure-eight")
+        for name in ("figure-8", "Figure 8", "Figure8"):
+            self.assertEqual(get_scenario(name).key, "figure-eight")
         self.assertEqual(get_scenario("circumbinary").key, "binary")
         self.assertEqual(get_scenario("trojan").key, "trojans")
+
+    def test_extents_cover_the_initial_bodies(self):
+        for scenario in SCENARIOS.values():
+            for body in scenario.bodies:
+                with self.subTest(scenario=scenario.key, body=body.name):
+                    self.assertLessEqual(abs(body.pos.x), scenario.extent[0])
+                    self.assertLessEqual(abs(body.pos.y), scenario.extent[1])
 
     def test_unknown_key_raises(self):
         with self.assertRaises(KeyError):

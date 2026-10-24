@@ -217,7 +217,12 @@ def orbital_elements(primary: Body, body: Body, g: float) -> Orbit:
         return Orbit(None, None, None)
     speed_sq = relative_velocity.norm_sq()
     specific_energy = 0.5 * speed_sq - mu / radius
-    semi_major = -mu / (2.0 * specific_energy) if specific_energy < 0.0 else None
+    energy_scale = mu / radius
+    # A tiny negative energy is a numerical parabola, not a gigantic ellipse.
+    if specific_energy < -1e-12 * energy_scale:
+        semi_major = -mu / (2.0 * specific_energy)
+    else:
+        semi_major = None
     eccentricity_vector = (
         relative_position * (speed_sq / mu - 1.0 / radius)
         - relative_velocity * (relative_position.dot(relative_velocity) / mu)

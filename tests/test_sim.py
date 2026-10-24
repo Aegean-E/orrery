@@ -69,6 +69,16 @@ class WorldTests(unittest.TestCase):
             self.assertLess(body.pos.distance_to(start), 2e-2,
                             f"{body.name} did not come back: {body.pos} vs {start}")
 
+    def test_parabolic_orbit_has_no_finite_elements(self):
+        mass = 1e-9
+        mu = 1.0 + mass
+        sun = Body("Sun", 1.0, Vec2(), Vec2(), "@")
+        comet = Body("Comet", mass, Vec2(1.0, 0.0), Vec2(0.0, math.sqrt(2.0 * mu)), "C")
+        orbit = orbital_elements(sun, comet, 1.0)
+        self.assertIsNone(orbit.semi_major)
+        self.assertIsNone(orbit.period)
+        self.assertAlmostEqual(orbit.eccentricity, 1.0, places=9)
+
     def test_orbital_elements_describe_a_unit_circle(self):
         mass = 3.0e-6
         speed = math.sqrt(G_SOLAR * (1.0 + mass))

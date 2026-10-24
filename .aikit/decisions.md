@@ -37,3 +37,29 @@ contract, a dependency, a data format or the architecture; IDs are consecutive a
 - **Consequences**: Frame tests compare plain strings, and snapshots and CSV export reuse the
   same simulation. The viewport is fixed for a run, so resizing the terminal mid-animation only
   takes effect on the next invocation.
+
+### ADR-003: Fit the viewport locally and cap unbounded CLI work
+- **Date**: 2026-10-23
+- **Status**: Accepted
+- **Context**: A fixed vertical span clipped wide scenarios on narrow terminals. Finite but
+  extreme `--at`, `--fps` and export ratios could also run for hours or overflow a float.
+- **Decision**: Each `Scenario` declares a half-extent. The CLI expands the vertical span to fit
+  that extent at the 2:1 cell aspect, and wraps the title, statistics and legend to the viewport
+  width. Snapshots above 2,000,000 steps require `--force`; exports are capped at 200,000 samples
+  and always include `--until`; frame rates are limited to 0.1–240 fps. Windows VT mode is
+  enabled before colour or cursor control and disabled on failure.
+- **Consequences**: Narrow output stays within its width and no body is clipped, at the cost of a
+  smaller drawing on very narrow terminals. Legitimate extreme runs remain available through
+  `--force`, but accidental ones fail fast.
+
+### ADR-004: Braille subcell trails on Unicode terminals
+- **Date**: 2026-10-23
+- **Status**: Accepted
+- **Context**: One trail mark per terminal cell leaves small circular orbits visibly polygonal.
+  Connecting samples at cell resolution removes gaps but cannot add resolution.
+- **Decision**: When Unicode is available, render trails into a 2×4 Braille dot grid (eight subcells
+  per cell), connect consecutive projected samples at subcell resolution, and overlay body symbols
+  on top. `--no-braille` selects one-cell line marks; `--ascii` selects plain ASCII lines and is
+  used by golden-frame tests.
+- **Consequences**: Orbits become noticeably smoother at the same terminal size. The default output
+  depends on a Braille-capable font; `--no-braille` and `--ascii` are explicit escape hatches.

@@ -44,6 +44,8 @@ class TrailRecorder:
     def advance_to(self, world: World, target: float, dt: float, every: int = 1) -> None:
         if not math.isfinite(target):
             raise ValueError("the target time must be finite")
+        if target < world.time - 1e-12:
+            raise ValueError("cannot travel backwards in time")
         if every < 1:
             raise ValueError("the sampling interval must be at least one step")
         while world.time < target - 1e-12:

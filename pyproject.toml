@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,14 +8,40 @@ version = "1.0.0"
 description = "A zero-dependency N-body orbital sandbox for the terminal"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [{ name = "AI Assistant" }]
+keywords = ["astronomy", "n-body", "orbital-mechanics", "terminal", "simulation"]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Environment :: Console",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Astronomy",
 ]
+
+[project.urls]
+Repository = "https://github.com/Aegean-E/orrery"
+
+[project.optional-dependencies]
+dev = ["build>=1.2", "ruff>=0.6"]
 
 [project.scripts]
 orrery = "orrery.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["orrery*"]
+
+[tool.setuptools.package-data]
+orrery = ["py.typed"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

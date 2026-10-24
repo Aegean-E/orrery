@@ -16,10 +16,16 @@ import time
 from typing import Sequence
 
 from . import __version__
-from .render import ANSI, RESET, Viewport, render_scene
+from .custom import ScenarioFileError, load_scenario_file
+from .render import ANSI, CELL_ASPECT, RESET, Viewport, render_scene, strip_ansi
 from .scenarios import Scenario, get_scenario, scenario_keys
 from .sim import Body, Orbit, World, orbital_elements
 from .trails import TrailRecorder
+
+SNAPSHOT_STEP_LIMIT = 2_000_000
+MAX_EXPORT_SAMPLES = 200_000
+MIN_FPS = 0.1
+MAX_FPS = 240.0
 
 
 class CliError(Exception):
@@ -48,12 +54,31 @@ def _scenario(name: str) -> Scenario:
     try:
         return get_scenario(name)
     except KeyError:
+        candidate = Path(name).expanduser()
+        if candidate.is_file() or name.lower().endswith(".json"):
+            try:
+                return load_scenario_file(candidate)
+            except ScenarioFileError as error:
+                raise CliError(
+                    f"could not load scenario '{name}': {error}",
+                    error.why,
+                    error.fix,
+                ) from None
         available = ", ".join(scenario_keys())
         raise CliError(
             f"unknown scenario '{name}'.",
             "a scenario key selects one built-in initial state.",
-            f"choose one of: {available}.",
+            f"choose one of: {available}, or pass a .json scenario file.",
         ) from None
+
+
+def _cmd_validate(args: argparse.Namespace) -> int:
+    try:
+        scenario = load_scenario_file(args.path)
+    except ScenarioFileError as error:
+        raise CliError(f"invalid scenario: {error}", error.why, error.fix) from None
+    print(f"OK: {scenario.key} ({scenario.title}) with {len(scenario.bodies)} bodies")
+    return 0
 
 
 def _color_enabled(args: argparse.Namespace) -> bool:
@@ -67,7 +92,7 @@ def _unicode_enabled(args: argparse.Namespace) -> bool:
         return False
     encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
     try:
-        "·─".encode(encoding)
+        "\u00b7\u2500\u0394\u2801".encode(encoding)
     except (UnicodeEncodeError, LookupError):
         return False
     return True
@@ -106,6 +131,58 @@ def _trail_limit(args: argparse.Namespace, scenario: Scenario) -> int:
             code=2,
         )
     return limit
+
+
+def _fit_span(scenario: Scenario, width: int, height: int,
+              aspect: float = CELL_ASPECT, margin: float = 1.05) -> float:
+    """Pick a vertical span large enough for the scenario's horizontal extent."""
+    half_width, half_height = scenario.extent
+    horizontal = 2.0 * aspect * (height - 1) * half_width * margin / (width - 1)
+    vertical = 2.0 * half_height * margin
+    return max(scenario.span, horizontal, vertical)
+
+
+def _viewport(scenario: Scenario, width: int, height: int,
+              aspect: float = CELL_ASPECT) -> Viewport:
+    return Viewport(width, height, _fit_span(scenario, width, height, aspect),
+                    aspect=aspect)
+
+
+def _aspect(args: argparse.Namespace) -> float:
+    aspect = getattr(args, "aspect", CELL_ASPECT)
+    if not math.isfinite(aspect) or not 0.25 <= aspect <= 4.0:
+        raise CliError(
+            f"--aspect {aspect:g} is outside the supported range.",
+            "the aspect describes how many character columns make one row of world scale.",
+            "pass a value between 0.25 and 4.0; the default is 2.0.",
+            code=2,
+        )
+    return aspect
+
+
+def _truncate(text: str, width: int) -> str:
+    if len(text) <= width:
+        return text
+    if width <= 3:
+        return "." * width
+    return text[:width - 3] + "..."
+
+
+def _pack_tokens(tokens: list[str], width: int, separator: str = "   ") -> list[str]:
+    lines: list[str] = []
+    current = ""
+    for token in tokens:
+        if len(strip_ansi(token)) > width:
+            token = _truncate(strip_ansi(token), width)
+        candidate = token if not current else f"{current}{separator}{token}"
+        if not current or len(strip_ansi(candidate)) <= width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = token
+    if current:
+        lines.append(current)
+    return lines
 
 
 def _fmt_mass(value: float) -> str:
@@ -174,8 +251,45 @@ def _info_payload(scenario: Scenario, world: World, primary_index: int) -> dict[
     }
 
 
+def _catalog_payload(scenario: Scenario) -> dict[str, object]:
+    return {
+        "key": scenario.key,
+        "title": scenario.title,
+        "description": scenario.description,
+        "bodies": [
+            {
+                "name": body.name,
+                "mass": body.mass,
+                "symbol": body.symbol,
+                "color": body.color,
+            }
+            for body in scenario.bodies
+        ],
+        "g": scenario.g,
+        "dt": scenario.dt,
+        "span": scenario.span,
+        "extent": list(scenario.extent),
+        "units": {
+            "time": scenario.time_unit,
+            "distance": scenario.distance_unit,
+            "mass": scenario.mass_unit,
+            "speed": scenario.speed_unit,
+            "speed_scale": scenario.speed_scale,
+        },
+        "steps_per_frame": scenario.steps_per_frame,
+        "trail_length": scenario.trail_length,
+        "record_every": scenario.record_every,
+        "default_frames": scenario.default_frames,
+        "export_until": scenario.export_until,
+    }
+
+
 def _cmd_list(args: argparse.Namespace) -> int:
     keys = scenario_keys()
+    if args.json:
+        print(json.dumps([_catalog_payload(get_scenario(key)) for key in keys],
+                         indent=2, allow_nan=False))
+        return 0
     width = max(len(key) for key in keys)
     print(f"{'key':<{width}}  {'bodies':>6}  {'span':>10}  title")
     for key in keys:
@@ -240,26 +354,28 @@ def _cmd_info(args: argparse.Namespace) -> int:
 
 def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
                    recorder: TrailRecorder, initial_energy: float,
-                   *, ascii_only: bool, color: bool) -> str:
+                   *, ascii_only: bool, color: bool, braille: bool = False) -> str:
     bar = "-" * viewport.width if ascii_only else "─" * viewport.width
     separator = " | " if ascii_only else " · "
     drift_label = "dE/E" if ascii_only else "ΔE/E"
-    lines = [f"ORRERY{separator}{scenario.title}", bar]
+    title = _truncate(f"ORRERY{separator}{scenario.title}", viewport.width)
+    lines = [title, bar]
     lines.extend(render_scene(world, recorder.trails, viewport,
-                              ascii_only=ascii_only, color=color))
+                              ascii_only=ascii_only, color=color, braille=braille))
     lines.append(bar)
-    lines.append(
-        f"t = {world.time:,.2f} {scenario.time_unit}"
-        f"    bodies = {len(world.bodies)}"
-        f"    {drift_label} = {world.energy_drift(initial_energy):+.2e}"
-    )
+    stats = [
+        f"t = {world.time:,.2f} {scenario.time_unit}",
+        f"bodies = {len(world.bodies)}",
+        f"{drift_label} = {world.energy_drift(initial_energy):+.2e}",
+    ]
+    lines.extend(_pack_tokens(stats, viewport.width, separator="    "))
     legend = []
     for body in world.bodies:
         if color:
             legend.append(f"{ANSI.get(body.color, ANSI['white'])}{body.symbol}{RESET} {body.name}")
         else:
             legend.append(f"{body.symbol} {body.name}")
-    lines.append("   ".join(legend))
+    lines.extend(_pack_tokens(legend, viewport.width))
     return "\n".join(lines)
 
 
@@ -282,21 +398,34 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
             f"{scenario.time_unit}.",
             code=2,
         )
+    estimated_steps = math.ceil(args.at / scenario.dt)
+    if estimated_steps > SNAPSHOT_STEP_LIMIT and not getattr(args, "force", False):
+        raise CliError(
+            f"--at {args.at:g} needs about {estimated_steps:,} integration steps.",
+            "a single snapshot should not run for hours without warning.",
+            "lower --at, or pass --force to allow the full run.",
+            code=2,
+        )
     width, height = _scene_size(args)
     world, recorder, initial_energy = _simulate(
         scenario, args.at, _trail_limit(args, scenario)
     )
-    viewport = Viewport(width, height, scenario.span)
+    viewport = _viewport(scenario, width, height, _aspect(args))
+    color = _color_enabled(args)
+    if color:
+        color = _enable_windows_ansi()
+    ascii_only = not _unicode_enabled(args)
+    braille = (not ascii_only) and not getattr(args, "no_braille", False)
     frame = _compose_frame(world, scenario, viewport, recorder, initial_energy,
-                           ascii_only=not _unicode_enabled(args),
-                           color=_color_enabled(args))
+                           ascii_only=ascii_only, color=color, braille=braille)
     print(frame)
     return 0
 
 
-def _enable_windows_ansi() -> None:
+def _enable_windows_ansi() -> bool:
+    """Enable VT processing when possible; return whether ANSI control is safe."""
     if os.name != "nt":
-        return
+        return True
     try:
         import ctypes
 
@@ -304,19 +433,21 @@ def _enable_windows_ansi() -> None:
         handle = kernel32.GetStdHandle(-11)
         mode = ctypes.c_uint32()
         if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
-            kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+            return bool(kernel32.SetConsoleMode(handle, mode.value | 0x0004))
+        return False
     # hygiene: allow VT-mode setup is best-effort; the ASCII renderer works without it
     except (AttributeError, OSError):
-        pass
+        return False
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
     scenario = _scenario(args.key)
-    if not math.isfinite(args.fps) or args.fps <= 0.0:
+    if not math.isfinite(args.fps) or not MIN_FPS <= args.fps <= MAX_FPS:
         raise CliError(
-            f"--fps {args.fps:g} is not a valid frame rate.",
-            "the player sleeps between frames, so the rate must be positive.",
-            "pass a finite value such as --fps 24.",
+            f"--fps {args.fps:g} is outside the supported range.",
+            f"the player sleeps between frames, so the rate must be between "
+            f"{MIN_FPS:g} and {MAX_FPS:g}.",
+            "pass a value such as --fps 24.",
             code=2,
         )
     interactive = sys.stdout.isatty()
@@ -331,13 +462,16 @@ def _cmd_run(args: argparse.Namespace) -> int:
     width, height = _scene_size(args)
     color = _color_enabled(args)
     ascii_only = not _unicode_enabled(args)
-    if interactive:
-        _enable_windows_ansi()
+    braille = (not ascii_only) and not getattr(args, "no_braille", False)
+    vt_ready = _enable_windows_ansi() if interactive else True
+    if not vt_ready:
+        color = False
+    screen_control = interactive and vt_ready
     world, recorder, initial_energy = _simulate(scenario, 0.0, _trail_limit(args, scenario))
-    viewport = Viewport(width, height, scenario.span)
+    viewport = _viewport(scenario, width, height, _aspect(args))
     frame_index = 0
     stopped = False
-    if interactive:
+    if screen_control:
         sys.stdout.write("\x1b[?25l")
         sys.stdout.flush()
     try:
@@ -345,11 +479,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
             recorder.advance(world, scenario.dt, scenario.steps_per_frame,
                              scenario.record_every)
             frame_index += 1
-            if interactive:
+            if screen_control:
                 sys.stdout.write("\x1b[H\x1b[2J")
             sys.stdout.write(_compose_frame(
                 world, scenario, viewport, recorder, initial_energy,
-                ascii_only=ascii_only, color=color,
+                ascii_only=ascii_only, color=color, braille=braille,
             ) + "\n")
             sys.stdout.flush()
             if frames == 0 or frame_index < frames:
@@ -357,7 +491,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         stopped = True
     finally:
-        if interactive:
+        if screen_control:
             sys.stdout.write("\x1b[?25h\n")
             sys.stdout.flush()
     if stopped:
@@ -371,8 +505,8 @@ def _cmd_export(args: argparse.Namespace) -> int:
     if out.exists() and out.is_dir():
         raise CliError(
             f"{out} is a directory.",
-            "the export writes a CSV file, not a folder.",
-            "pass a file path such as --out orbit.csv.",
+            "the export writes a data file, not a folder.",
+            "pass a file path such as --out orbit.csv or orbit.json.",
             code=2,
         )
     if not out.parent.exists():
@@ -398,14 +532,39 @@ def _cmd_export(args: argparse.Namespace) -> int:
             f"pass a value such as --every {scenario.dt * scenario.steps_per_frame:g}.",
             code=2,
         )
-    sample_count = int(math.floor(until / every + 1e-12)) + 1
-    if sample_count > 200_000:
+    ratio = until / every
+    if not math.isfinite(ratio):
+        raise CliError(
+            "the export window is too large.",
+            "dividing the window by the interval overflowed the sample count.",
+            "increase --every or decrease --until.",
+            code=2,
+        )
+    sample_count = int(math.floor(ratio + 1e-12)) + 1
+    if sample_count > MAX_EXPORT_SAMPLES:
         raise CliError(
             f"the export would write {sample_count:,} samples.",
             "an unbounded sample count can fill the disk and stall the terminal.",
             "increase --every or decrease --until.",
             code=2,
         )
+    targets = [index * every for index in range(sample_count)]
+    if targets[-1] < until - 1e-12:
+        targets.append(until)
+    if len(targets) > MAX_EXPORT_SAMPLES:
+        raise CliError(
+            f"the export would write {len(targets):,} samples.",
+            "an unbounded sample count can fill the disk and stall the terminal.",
+            "increase --every or decrease --until.",
+            code=2,
+        )
+    export_format = getattr(args, "format", "csv")
+    metadata = _catalog_payload(scenario)
+    metadata["export"] = {
+        "until": until,
+        "every": every,
+        "samples": len(targets),
+    }
     world = World(scenario.bodies, scenario.g)
     temporary: Path | None = None
     try:
@@ -415,21 +574,48 @@ def _cmd_export(args: argparse.Namespace) -> int:
         )
         temporary = Path(handle.name)
         with handle:
-            writer = csv.writer(handle)
-            writer.writerow(["time", "body", "x", "y", "vx", "vy", "speed"])
-            for index in range(sample_count):
-                target = index * every
-                world.advance_to(target, scenario.dt)
-                for body in world.bodies:
-                    writer.writerow([
-                        f"{world.time:.10g}",
-                        body.name,
-                        f"{body.pos.x:.12g}",
-                        f"{body.pos.y:.12g}",
-                        f"{body.vel.x:.12g}",
-                        f"{body.vel.y:.12g}",
-                        f"{body.vel.norm():.12g}",
-                    ])
+            if export_format == "csv":
+                writer = csv.writer(handle)
+                writer.writerow(["time", "body", "x", "y", "vx", "vy", "speed"])
+                for target in targets:
+                    world.advance_to(target, scenario.dt)
+                    for body in world.bodies:
+                        writer.writerow([
+                            f"{world.time:.10g}",
+                            body.name,
+                            f"{body.pos.x:.12g}",
+                            f"{body.pos.y:.12g}",
+                            f"{body.vel.x:.12g}",
+                            f"{body.vel.y:.12g}",
+                            f"{body.vel.norm():.12g}",
+                        ])
+            else:
+                handle.write('{\n  "scenario": ')
+                json.dump(metadata, handle, allow_nan=False)
+                handle.write(',\n  "samples": [')
+                first = True
+                for target in targets:
+                    world.advance_to(target, scenario.dt)
+                    sample = {
+                        "time": world.time,
+                        "bodies": [
+                            {
+                                "name": body.name,
+                                "x": body.pos.x,
+                                "y": body.pos.y,
+                                "vx": body.vel.x,
+                                "vy": body.vel.y,
+                                "speed": body.vel.norm(),
+                            }
+                            for body in world.bodies
+                        ],
+                    }
+                    if not first:
+                        handle.write(",")
+                    handle.write("\n    ")
+                    json.dump(sample, handle, allow_nan=False)
+                    first = False
+                handle.write("\n  ]\n}\n")
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, out)
@@ -443,8 +629,9 @@ def _cmd_export(args: argparse.Namespace) -> int:
     finally:
         if temporary is not None and temporary.exists():
             temporary.unlink(missing_ok=True)
-    rows = sample_count * len(world.bodies)
-    print(f"wrote {rows:,} rows across {sample_count:,} samples to {out}")
+    rows = len(targets) * len(world.bodies)
+    print(f"wrote {rows:,} rows across {len(targets):,} samples to {out} "
+          f"({export_format})")
     print(f"units: {scenario.distance_unit}, {scenario.time_unit}; "
           f"velocity in {scenario.distance_unit}/{scenario.time_unit}")
     return 0
@@ -459,6 +646,10 @@ def _add_view_options(parser: argparse.ArgumentParser, *, trails: bool = False) 
                         help="use ASCII borders and trail dots only")
     parser.add_argument("--no-color", action="store_true",
                         help="disable ANSI colour even on a terminal")
+    parser.add_argument("--aspect", type=float, default=CELL_ASPECT,
+                        help="terminal cell height/width ratio (default: 2.0)")
+    parser.add_argument("--no-braille", action="store_true",
+                        help="use one-cell trail marks instead of Braille subcells")
     if trails:
         parser.add_argument("--trail", type=int, default=None,
                             help="number of recorded positions per body")
@@ -476,35 +667,45 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True, parser_class=TriadParser)
 
     listing = commands.add_parser("list", help="show the built-in scenarios")
+    listing.add_argument("--json", action="store_true",
+                         help="emit the catalogue as machine-readable JSON")
     listing.set_defaults(handler=_cmd_list)
 
     info = commands.add_parser("info", help="describe a scenario and its initial orbits")
-    info.add_argument("key", help="scenario key or alias")
+    info.add_argument("key", help="scenario key, alias, or .json scenario file")
     info.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     info.set_defaults(handler=_cmd_info)
 
+    validate = commands.add_parser("validate", help="validate a custom JSON scenario")
+    validate.add_argument("path", help="path to a scenario .json file")
+    validate.set_defaults(handler=_cmd_validate)
+
     snapshot = commands.add_parser("snapshot", help="draw one frame at a chosen time")
-    snapshot.add_argument("key", help="scenario key")
+    snapshot.add_argument("key", help="scenario key, alias, or .json scenario file")
     snapshot.add_argument("--at", type=float, default=0.0,
                           help="simulation time to reach before drawing")
+    snapshot.add_argument("--force", action="store_true",
+                          help="allow a snapshot beyond the integration-step budget")
     _add_view_options(snapshot, trails=True)
     snapshot.set_defaults(handler=_cmd_snapshot)
 
     run = commands.add_parser("run", help="animate a scenario in the terminal")
-    run.add_argument("key", help="scenario key")
+    run.add_argument("key", help="scenario key, alias, or .json scenario file")
     run.add_argument("--frames", type=int, default=None,
                      help="number of frames; 0 loops forever "
                           "(default: forever on a terminal, one still when piped)")
     run.add_argument("--fps", type=float, default=24.0,
-                     help="frames per second (default: 24)")
+                     help=f"frames per second, {MIN_FPS:g}-{MAX_FPS:g} (default: 24)")
     _add_view_options(run, trails=True)
     run.set_defaults(handler=_cmd_run)
 
     export = commands.add_parser("export", help="write sampled positions to CSV")
-    export.add_argument("key", help="scenario key")
-    export.add_argument("--out", required=True, help="destination CSV file")
+    export.add_argument("key", help="scenario key, alias, or .json scenario file")
+    export.add_argument("--out", required=True, help="destination data file")
+    export.add_argument("--format", choices=("csv", "json"), default="csv",
+                        help="output format (default: csv)")
     export.add_argument("--until", type=float, default=None,
-                        help="end of the export window")
+                        help="end of the export window; the final state is included")
     export.add_argument("--every", type=float, default=None,
                         help="sampling interval in simulation time")
     export.set_defaults(handler=_cmd_export)

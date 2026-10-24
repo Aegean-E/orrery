@@ -1,0 +1,39 @@
+{
+  "key": "custom-two-body",
+  "title": "Custom Two-Body System",
+  "description": "A star and a planet in a near-circular orbit loaded from JSON. Copy this file and change the numbers to build your own world.",
+  "g": 1.0,
+  "dt": 0.002,
+  "span": 2.6,
+  "extent": [1.2, 1.2],
+  "units": {
+    "time": "t",
+    "distance": "u",
+    "mass": "m",
+    "speed": "u/t",
+    "speed_scale": 1.0
+  },
+  "steps_per_frame": 10,
+  "trail_length": 1200,
+  "record_every": 1,
+  "default_frames": 200,
+  "export_until": 6.283185,
+  "bodies": [
+    {
+      "name": "Sun",
+      "mass": 1.0,
+      "position": [0.0, 0.0],
+      "velocity": [0.0, 0.0],
+      "symbol": "S",
+      "color": "yellow"
+    },
+    {
+      "name": "Planet",
+      "mass": 0.001,
+      "position": [1.0, 0.0],
+      "velocity": [0.0, 1.0005],
+      "symbol": "P",
+      "color": "blue"
+    }
+  ]
+}
