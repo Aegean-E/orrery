@@ -174,8 +174,9 @@ def run_server(port: int = DEFAULT_PORT, host: str = DEFAULT_HOST,
                once: bool = False) -> int:
     """Run the zero-dependency Orrery Web HTTP server."""
     server_address = (host, port)
+    server_cls = http.server.HTTPServer if once else http.server.ThreadingHTTPServer
     try:
-        httpd = http.server.ThreadingHTTPServer(server_address, OrreryHandler)
+        httpd = server_cls(server_address, OrreryHandler)
     except OSError as error:
         sys.stderr.write(f"Error: could not bind to {host}:{port}: {error}\n")
         return 1

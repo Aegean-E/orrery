@@ -66,6 +66,7 @@ class WebApiTests(unittest.TestCase):
             self.assertEqual(err.code, 404)
             data = json.loads(err.read().decode("utf-8"))
             self.assertIn("error", data)
+            err.close()
 
     def test_api_validate_endpoint(self):
         # Valid custom payload
@@ -102,18 +103,25 @@ class WebApiTests(unittest.TestCase):
         port = server.server_port
         server.server_close()
 
+        results = {}
+
         def _hit():
             time.sleep(0.08)
             try:
                 with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health") as resp:
-                    _ = resp.read()
+                    results["status"] = resp.status
+                    results["data"] = json.loads(resp.read().decode("utf-8"))
             # hygiene: allow test probe failure during server startup
-            except Exception:
-                pass
+            except Exception as err:
+                results["error"] = str(err)
 
-        threading.Thread(target=_hit, daemon=True).start()
+        th = threading.Thread(target=_hit, daemon=True)
+        th.start()
         exit_code = run_server(port=port, auto_open=False, once=True)
+        th.join(timeout=1.0)
         self.assertEqual(exit_code, 0)
+        self.assertEqual(results.get("status"), 200)
+        self.assertEqual(results.get("data", {}).get("status"), "ok")
 
 
 if __name__ == "__main__":

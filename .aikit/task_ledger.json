@@ -1,45 +1,14 @@
 {
   "version": 1,
   "active_task": {
-    "task_id": "orrery-v8",
+    "task_id": "orrery-v8-polish",
     "last_phase": "phase 4",
-    "active_phase": 5,
-    "status": "completed",
-    "updated_at": 1792861195.8848119,
-    "owner": "unidentified",
-    "completed_at": 1792861222.331314
+    "active_phase": 4,
+    "status": "in_progress",
+    "updated_at": 1792861573.2090688,
+    "owner": "unidentified"
   },
   "checkpoints": [
-    {
-      "task_id": "orrery-v3",
-      "phase": "phase 4",
-      "phase_num": 4,
-      "description": "[4/5] Implemented interactive keyboard controls, live telemetry HUD (ADR-005), 6th world (Lagrange pinwheel), trail clearing; 85 tests pass; 5/5 gates pass; checklists: passed",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792831510.8782659,
-      "timestamp_str": "2026-10-24 11:45:10",
-      "handoff": {
-        "state": "all implementation complete",
-        "next": "stage explicitly, commit, verify strict, and push to origin master",
-        "evidence": "85 tests pass, 5/5 gates pass"
-      }
-    },
-    {
-      "task_id": "orrery-v3",
-      "phase": "phase 5",
-      "phase_num": 5,
-      "description": "[5/5] Delivered: committed eaa7d36, 85 tests and 5/5 strict gates pass; checklists: passed",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792831536.6792018,
-      "timestamp_str": "2026-10-24 11:45:36",
-      "handoff": {
-        "state": "delivered",
-        "next": "push to remote",
-        "evidence": "85 tests, 5/5 strict gates, commit eaa7d36"
-      }
-    },
     {
       "task_id": "orrery-v3",
       "phase": "completed",
@@ -263,6 +232,34 @@
       "status": "completed",
       "timestamp": 1792861222.331316,
       "timestamp_str": "2026-10-24 20:00:22",
+      "agent": "unidentified"
+    },
+    {
+      "task_id": "orrery-v8-polish",
+      "phase": "phase 1",
+      "phase_num": 1,
+      "description": "[1/2] Robustify web server single-request handling and eliminate HTTP resource warning; checklists: passed",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792861569.1214714,
+      "timestamp_str": "2026-10-24 20:06:09",
+      "agent": "unidentified",
+      "impact_assessment": {
+        "why": "Prevent socket reset race in single-request test mode",
+        "benefits": "Clean synchronous response delivery in --once mode",
+        "risks": "None",
+        "mitigation": "Regression tested"
+      }
+    },
+    {
+      "task_id": "orrery-v8-polish",
+      "phase": "phase 4",
+      "phase_num": 4,
+      "description": "[2/2] 128 tests pass; 5/5 gates pass; checklists: passed",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792861573.2090688,
+      "timestamp_str": "2026-10-24 20:06:13",
       "agent": "unidentified"
     }
   ]

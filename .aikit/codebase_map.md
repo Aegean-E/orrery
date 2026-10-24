@@ -10,7 +10,7 @@
 - **Total Classes**: `28`
 - **Total Top-Level Functions**: `72`
 - **Total Class Methods**: `188`
-- **Total Source Lines**: `5546`
+- **Total Source Lines**: `5555`
 
 ---
 
@@ -223,7 +223,7 @@
 ### [`orrery/web.py`](orrery/web.py)
 > *Zero-dependency HTTP server and embedded interactive Web-based UI for Orrery.*
 
-**Size**: `1121` lines (`37893` bytes)
+**Size**: `1122` lines (`37957` bytes)
 
 **Classes:**
 - `class OrreryHandler` - *HTTP request handler serving the single-page application and JSON APIs.*
@@ -457,7 +457,7 @@
 ---
 
 ### [`tests/test_web.py`](tests/test_web.py)
-**Size**: `120` lines (`4617` bytes)
+**Size**: `128` lines (`4955` bytes)
 
 **Classes:**
 - `class WebApiTests`

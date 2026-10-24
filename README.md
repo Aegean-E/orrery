@@ -231,7 +231,7 @@ orrery/
 
 ## 🧪 Verification
 
-The suite is 127 tests and completes in about 2.5 seconds:
+The suite is 128 tests and completes in about 2.0 seconds:
 
 ```bash
 python -m unittest discover -s tests -t .
