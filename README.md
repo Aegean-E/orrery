@@ -90,6 +90,7 @@ pass `--no-braille` for one-cell trail marks, or `--ascii` to force ASCII border
 | `binary` | Two half-solar stars, one planet | A Jupiter-mass planet on a circumbinary orbit while its two suns wobble around their barycentre. |
 | `trojans` | Sun, Jupiter, Achilles, Patroclus | The stable L4 and L5 Lagrange points, 60° ahead of and behind Jupiter. |
 | `pythagorean` | Three, Four, Five | The classic 3-4-5 three-body problem: the masses start at rest, have a close chaotic encounter, and two are slung outward. |
+| `lagrange` | Three equal masses | The 1772 Euler-Lagrange pinwheel: three equal masses at the vertices of an equilateral triangle rotating rigidly. |
 
 Aliases are forgiving: `inner`, `inner-solar-system`, `solar-system`, `figure-8`, `figure8`,
 `eight`, `three-body`, `circumbinary`, `trojan`, `jupiter-trojans`, `pythagoras`, `chaos` and
@@ -103,7 +104,7 @@ python -m orrery info KEY|FILE [--json]
 python -m orrery validate FILE
 python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
 python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
-python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME]
+python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME] [--relativity] [--c-light C] [--merge] [--merge-radius R]
 ```
 
 - `list --json` emits the scenario catalogue with units, extents and initial bodies.
@@ -112,9 +113,7 @@ python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [
 - `run` loops on a terminal; `--frames 0` loops forever, and a piped run defaults to one still.
   Frame rates are limited to `0.1`–`240` fps so a typo cannot sleep for years. `--aspect` overrides
   the assumed 2:1 character-cell ratio when your font or terminal differs.
-  Interactive keyboard controls on terminals: Space pauses/resumes, +/- adjusts speed,
-  c clears trails, 
- resets the simulation, 	 toggles live telemetry HUD, and q quits.
+  Interactive keyboard controls on terminals: Space pauses/resumes, . or > steps one frame while paused, f or 1-9 tracks bodies, WASD or arrow keys pan, [ or ] zoom, 0 resets camera, n or p cycles scenarios, +/- adjusts speed, c clears trails, r resets simulation, t toggles live telemetry HUD, and q quits.
 - `info` prints initial distances, osculating orbital elements and energy. `--json` is stable and
   machine-readable. If no single body dominates (the figure-eight and binary worlds), the
   two-body orbit columns are deliberately blank rather than misleading.
@@ -129,7 +128,7 @@ Every failure follows the same triad:
 ```text
 Error: unknown scenario 'nibiru'.
 Why: a scenario key selects one built-in initial state.
-Fix: choose one of: solar, figure-eight, binary, trojans.
+Fix: choose one of: solar, figure-eight, binary, trojans, pythagorean, lagrange.
 ```
 
 Exit codes are `0` success, `1` runtime failure, `2` bad usage.

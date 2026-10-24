@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from orrery.cli import KeyboardReader, _sparkline, _viewport, main
+from orrery.cli import KeyboardReader, _compose_frame, _sparkline, _viewport, main
 from orrery.scenarios import SCENARIOS
 from orrery.sim import World
 
@@ -318,6 +318,57 @@ class InteractiveAndTelemetryTests(unittest.TestCase):
         code, output = run_cli("snapshot", "solar", "--merge", "--merge-radius", "0.05",
                                "--ascii", "--no-color", "--no-trail")
         self.assertEqual(code, 0)
+
+    def test_run_paused_single_step(self):
+        keys = iter([" ", ".", ">", "q"])
+
+        def fake_poll(self):
+            return next(keys, None)
+
+        with mock.patch.object(KeyboardReader, "poll", fake_poll):
+            with mock.patch("sys.stdout.isatty", return_value=True):
+                with mock.patch("sys.stdin.isatty", return_value=True):
+                    code, output = run_cli("run", "solar", "--frames", "0",
+                                           "--ascii", "--no-color")
+                    self.assertEqual(code, 0)
+                    self.assertIn("Stopped at t =", output)
+
+    def test_export_relativity_and_merge(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "rel_merge.json"
+            code, output = run_cli("export", "solar", "--out", str(target),
+                                   "--until", "2", "--every", "1", "--format", "json",
+                                   "--relativity", "--c-light", "120.0",
+                                   "--merge", "--merge-radius", "0.05")
+            self.assertEqual(code, 0)
+            payload = json.loads(target.read_text(encoding="utf-8"))
+            self.assertTrue(payload["scenario"]["export"]["relativity"])
+            self.assertEqual(payload["scenario"]["export"]["c"], 120.0)
+            self.assertEqual(payload["scenario"]["export"]["merge_radius"], 0.05)
+
+    def test_keyboard_arrow_mapping(self):
+        fake_msvcrt = mock.MagicMock()
+        fake_msvcrt.kbhit.side_effect = [True, True, True, True, False]
+        fake_msvcrt.getwch.side_effect = ["\xe0", "H", "\xe0", "M"]
+        with mock.patch("sys.stdin.isatty", return_value=True):
+            with mock.patch.dict("sys.modules", {"msvcrt": fake_msvcrt}):
+                with mock.patch("os.name", "nt"):
+                    reader = KeyboardReader(enabled=True)
+                    self.assertEqual(reader.poll(), "w")
+                    self.assertEqual(reader.poll(), "d")
+
+    def test_compose_frame_fps_and_step_hint(self):
+        scenario = SCENARIOS["solar"]
+        world = World(scenario.bodies, scenario.g)
+        recorder = mock.MagicMock()
+        recorder.trails = [[] for _ in world.bodies]
+        viewport = _viewport(scenario, 80, 24, 2.0)
+        frame = _compose_frame(
+            world, scenario, viewport, recorder, world.total_energy(),
+            ascii_only=True, color=False, fps=24.0, controls_hint=True,
+        )
+        self.assertIn("fps = 24.0", frame)
+        self.assertIn("[.] Step", frame)
 
 
 if __name__ == "__main__":

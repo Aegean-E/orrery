@@ -208,21 +208,33 @@ class World:
             self.bodies = tuple(bodies_list)
         return events
 
-    def advance(self, dt: float, steps: int) -> None:
+    def advance(self, dt: float, steps: int, merge_radius: float = 0.0) -> list[tuple[str, str, str]]:
         if steps < 0:
             raise ValueError("steps cannot be negative")
+        events: list[tuple[str, str, str]] = []
         for _ in range(steps):
             self.step(dt)
+            if merge_radius > 0.0:
+                step_events = self.resolve_collisions(merge_radius)
+                if step_events:
+                    events.extend(step_events)
+        return events
 
-    def advance_to(self, target: float, dt: float) -> None:
+    def advance_to(self, target: float, dt: float, merge_radius: float = 0.0) -> list[tuple[str, str, str]]:
         """Integrate to ``target``, ending with a shorter step when needed."""
         if not math.isfinite(target):
             raise ValueError("the target time must be finite")
         if target < self.time - 1e-12:
             raise ValueError("cannot travel backwards in time")
+        events: list[tuple[str, str, str]] = []
         while self.time < target - 1e-12:
             remaining = target - self.time
             self.step(dt if remaining > dt else remaining)
+            if merge_radius > 0.0:
+                step_events = self.resolve_collisions(merge_radius)
+                if step_events:
+                    events.extend(step_events)
+        return events
 
     @property
     def total_mass(self) -> float:

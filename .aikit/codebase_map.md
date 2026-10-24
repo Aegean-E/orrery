@@ -9,8 +9,8 @@
 - **Total Python Modules**: `18`
 - **Total Classes**: `26`
 - **Total Top-Level Functions**: `62`
-- **Total Class Methods**: `139`
-- **Total Source Lines**: `3289`
+- **Total Class Methods**: `145`
+- **Total Source Lines**: `3421`
 
 ---
 
@@ -33,7 +33,7 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `1028` lines (`42988` bytes)
+**Size**: `1064` lines (`44708` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
@@ -68,7 +68,7 @@
 - `def _cmd_list(args)`
 - `def _cmd_info(args)`
 - `def _sparkline(values, width, *, ascii_only)` - *Render a compact sparkline trend string for a series of numeric samples.*
-- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused, camera_label)`
+- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused, camera_label, fps)`
 - `def _simulate(scenario, target, trail_limit, *, relativity, c_override, merge_radius)`
 - `def _cmd_snapshot(args)`
 - `def _enable_windows_ansi()` - *Enable VT processing when possible; return whether ANSI control is safe.*
@@ -154,7 +154,7 @@
 ### [`orrery/sim.py`](orrery/sim.py)
 > *Gravity, bodies and a symplectic leapfrog integrator.*
 
-**Size**: `295` lines (`11176` bytes)
+**Size**: `307` lines (`11778` bytes)
 
 **Classes:**
 - `class Vec2` - *A point or vector in the plane.*
@@ -175,8 +175,8 @@
   - Method `.accelerations()`
   - Method `.step(dt)` - *Advance one kick-drift-kick leapfrog step of length ``dt``.*
   - Method `.resolve_collisions(merge_radius)` - *Inelastically merge bodies closer than merge_radius, conserving momentum.*
-  - Method `.advance(dt, steps)`
-  - Method `.advance_to(target, dt)` - *Integrate to ``target``, ending with a shorter step when needed.*
+  - Method `.advance(dt, steps, merge_radius)`
+  - Method `.advance_to(target, dt, merge_radius)` - *Integrate to ``target``, ending with a shorter step when needed.*
   - Property `.total_mass`
   - Method `.momentum()`
   - Method `.center_of_mass()`
@@ -195,7 +195,7 @@
 ### [`orrery/trails.py`](orrery/trails.py)
 > *Bounded, sampled position history for drawing orbit trails.*
 
-**Size**: `80` lines (`3143` bytes)
+**Size**: `88` lines (`3498` bytes)
 
 **Classes:**
 - `class TrailRecorder` - *Keep one bounded deque of past positions per body, sampled every N steps.*
@@ -205,7 +205,7 @@
   - Method `.record(world)`
   - Method `.clear(world)` - *Clear historical trail samples, seeding with current positions if world is given.*
   - Method `.advance(world, dt, steps, every, merge_radius)`
-  - Method `.advance_to(world, target, dt, every)`
+  - Method `.advance_to(world, target, dt, every, merge_radius)`
 
 ---
 
@@ -215,7 +215,7 @@
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `324` lines (`14895` bytes)
+**Size**: `375` lines (`17455` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -255,6 +255,10 @@
   - Method `.test_camera_pan_zoom_and_tracking()`
   - Method `.test_scenario_switching_keys()`
   - Method `.test_cli_relativity_and_merge_flags()`
+  - Method `.test_run_paused_single_step()`
+  - Method `.test_export_relativity_and_merge()`
+  - Method `.test_keyboard_arrow_mapping()`
+  - Method `.test_compose_frame_fps_and_step_hint()`
 
 **Functions:**
 - `def run_cli(*argv)`
@@ -361,7 +365,7 @@
 ---
 
 ### [`tests/test_sim.py`](tests/test_sim.py)
-**Size**: `153` lines (`7298` bytes)
+**Size**: `168` lines (`7993` bytes)
 
 **Classes:**
 - `class Vec2Tests`
@@ -376,12 +380,13 @@
   - Method `.test_orbital_elements_describe_a_unit_circle()`
   - Method `.test_relativity_post_newtonian_precession()`
   - Method `.test_resolve_collisions_inelastic_merger()`
+  - Method `.test_advance_and_advance_to_with_merge_radius()`
   - Method `.test_invalid_inputs_are_rejected()`
 
 ---
 
 ### [`tests/test_trails.py`](tests/test_trails.py)
-**Size**: `63` lines (`2375` bytes)
+**Size**: `73` lines (`2851` bytes)
 
 **Classes:**
 - `class TrailRecorderTests`
@@ -389,6 +394,7 @@
   - Method `.test_limit_keeps_the_most_recent_positions()`
   - Method `.test_sampling_every_other_step()`
   - Method `.test_advance_to_uses_a_short_final_step()`
+  - Method `.test_advance_to_resolves_collisions()`
   - Method `.test_zero_limit_disables_history()`
   - Method `.test_clear_resets_trail_history()`
   - Method `.test_invalid_arguments_are_rejected()`

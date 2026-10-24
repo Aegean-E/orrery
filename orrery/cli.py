@@ -256,7 +256,7 @@ def _info_payload(scenario: Scenario, world: World, primary_index: int) -> dict[
 
 
 def _catalog_payload(scenario: Scenario) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "key": scenario.key,
         "title": scenario.title,
         "description": scenario.description,
@@ -286,6 +286,9 @@ def _catalog_payload(scenario: Scenario) -> dict[str, object]:
         "default_frames": scenario.default_frames,
         "export_until": scenario.export_until,
     }
+    if scenario.c is not None:
+        payload["c"] = scenario.c
+    return payload
 
 
 def _cmd_list(args: argparse.Namespace) -> int:
@@ -428,7 +431,14 @@ class KeyboardReader:
                 import msvcrt
 
                 if msvcrt.kbhit():
-                    return msvcrt.getwch()
+                    ch = msvcrt.getwch()
+                    if ch in ("\x00", "\xe0"):
+                        if msvcrt.kbhit():
+                            ch2 = msvcrt.getwch()
+                            arrow_map = {"H": "w", "P": "s", "K": "a", "M": "d"}
+                            return arrow_map.get(ch2, None)
+                        return None
+                    return ch
             # hygiene: allow non-blocking read is best-effort
             except Exception:
                 return None
@@ -438,7 +448,16 @@ class KeyboardReader:
 
             rlist, _, _ = select.select([sys.stdin], [], [], 0)
             if rlist:
-                return sys.stdin.read(1)
+                ch = sys.stdin.read(1)
+                if ch == "\x1b":
+                    rlist2, _, _ = select.select([sys.stdin], [], [], 0)
+                    if rlist2:
+                        ch2 = sys.stdin.read(1)
+                        if ch2 == "[":
+                            ch3 = sys.stdin.read(1)
+                            arrow_map = {"A": "w", "B": "s", "D": "a", "C": "d"}
+                            return arrow_map.get(ch3, None)
+                return ch
         # hygiene: allow non-blocking read is best-effort
         except Exception:
             return None
@@ -453,7 +472,8 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
                    initial_momentum: float | None = None,
                    controls_hint: bool = False,
                    paused: bool = False,
-                   camera_label: str | None = None) -> str:
+                   camera_label: str | None = None,
+                   fps: float | None = None) -> str:
     bar = "-" * viewport.width if ascii_only else "─" * viewport.width
     separator = " | " if ascii_only else " · "
     drift_label = "dE/E" if ascii_only else "ΔE/E"
@@ -469,6 +489,8 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
         f"bodies = {len(world.bodies)}",
         f"{drift_label} = {current_drift:+.2e}",
     ]
+    if fps is not None:
+        stats.append(f"fps = {fps:.1f}")
     if camera_label:
         stats.append(f"cam: {camera_label}")
     lines.extend(_pack_tokens(stats, viewport.width, separator="    "))
@@ -494,12 +516,12 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
             legend.append(f"{body.symbol} {body.name}")
     lines.extend(_pack_tokens(legend, viewport.width))
     if controls_hint:
-        hint_text = "[Space] Pause  [f] Track  [WASD] Pan  [[]] Zoom  [n/p] World  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
+        hint_text = "[Space] Pause  [.] Step  [f] Track  [WASD] Pan  [[]] Zoom  [n/p] World  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
         if len(hint_text) <= viewport.width:
             lines.append(hint_text)
         else:
             lines.extend(_pack_tokens([
-                "[Space] Pause", "[f] Track", "[WASD] Pan", "[[]] Zoom",
+                "[Space] Pause", "[.] Step", "[f] Track", "[WASD] Pan", "[[]] Zoom",
                 "[n/p] World", "[C] Clear", "[R] Reset", "[T] Telemetry", "[Q] Quit",
             ], viewport.width, separator="  "))
     return "\n".join(lines)
@@ -512,10 +534,7 @@ def _simulate(scenario: Scenario, target: float, trail_limit: int,
     world = World(scenario.bodies, scenario.g, c=c_val)
     initial_energy = world.total_energy()
     recorder = TrailRecorder(world, trail_limit)
-    recorder.advance_to(world, target, scenario.dt, scenario.record_every)
-    if merge_radius > 0.0:
-        world.resolve_collisions(merge_radius)
-        recorder.sync(world)
+    recorder.advance_to(world, target, scenario.dt, scenario.record_every, merge_radius=merge_radius)
     return world, recorder, initial_energy
 
 
@@ -622,6 +641,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     frame_index = 0
     stopped = False
     paused = False
+    single_step = False
     fps = args.fps
     telemetry_enabled = getattr(args, "telemetry", False)
     controls_enabled = interactive and not getattr(args, "no_controls", False)
@@ -647,6 +667,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         break
                     if key == " ":
                         paused = not paused
+                    elif key in (".", ">"):
+                        single_step = True
                     elif key in ("+", "="):
                         fps = min(MAX_FPS, fps * 1.5)
                     elif key in ("-", "_"):
@@ -721,13 +743,14 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 if stopped:
                     break
 
-                if not paused:
+                if not paused or single_step:
                     recorder.advance(world, scenario.dt, scenario.steps_per_frame,
                                      scenario.record_every, merge_radius=merge_radius)
                     frame_index += 1
                     energy_history.append(world.energy_drift(initial_energy))
                     if len(energy_history) > 60:
                         energy_history.pop(0)
+                    single_step = False
 
                 if tracking_index is not None and tracking_index < len(world.bodies):
                     center_pos = world.bodies[tracking_index].pos + pan_offset
@@ -759,6 +782,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     controls_hint=show_hints,
                     paused=paused,
                     camera_label=camera_label,
+                    fps=fps,
                 ) + "\n")
                 sys.stdout.flush()
                 if frames == 0 or frame_index < frames:
@@ -835,13 +859,24 @@ def _cmd_export(args: argparse.Namespace) -> int:
             code=2,
         )
     export_format = getattr(args, "format", "csv")
+    relativity = getattr(args, "relativity", False)
+    c_override = getattr(args, "c_light", None)
+    c_val = c_override if c_override is not None else (scenario.c if relativity else None)
+    merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
+
     metadata = _catalog_payload(scenario)
     metadata["export"] = {
         "until": until,
         "every": every,
         "samples": len(targets),
     }
-    world = World(scenario.bodies, scenario.g)
+    if relativity:
+        metadata["export"]["relativity"] = True
+        metadata["export"]["c"] = c_val
+    if merge_radius > 0.0:
+        metadata["export"]["merge_radius"] = merge_radius
+
+    world = World(scenario.bodies, scenario.g, c=c_val)
     temporary: Path | None = None
     try:
         handle = tempfile.NamedTemporaryFile(
@@ -854,7 +889,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
                 writer = csv.writer(handle)
                 writer.writerow(["time", "body", "x", "y", "vx", "vy", "speed"])
                 for target in targets:
-                    world.advance_to(target, scenario.dt)
+                    world.advance_to(target, scenario.dt, merge_radius=merge_radius)
                     for body in world.bodies:
                         writer.writerow([
                             f"{world.time:.10g}",
@@ -871,7 +906,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
                 handle.write(',\n  "samples": [')
                 first = True
                 for target in targets:
-                    world.advance_to(target, scenario.dt)
+                    world.advance_to(target, scenario.dt, merge_radius=merge_radius)
                     sample = {
                         "time": world.time,
                         "bodies": [
@@ -1003,6 +1038,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="end of the export window; the final state is included")
     export.add_argument("--every", type=float, default=None,
                         help="sampling interval in simulation time")
+    _add_physics_options(export)
     export.set_defaults(handler=_cmd_export)
     return parser
 

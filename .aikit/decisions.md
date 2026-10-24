@@ -93,3 +93,18 @@ contract, a dependency, a data format or the architecture; IDs are consecutive a
   with automatic trail recorder buffer synchronization.
 - **Consequences**: Orrery functions as a multi-reference-frame observatory with relativistic and accretion
   capabilities while remaining completely zero-dependency and backward-compatible.
+
+### ADR-007: Physics export parity, single-frame stepping, and multi-step collision resolution
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**: Exporting trajectories to CSV/JSON previously omitted 1PN relativistic precession and
+  inelastic mergers. Long integration intervals in advance_to could miss collisions occurring between
+  coarse sample times. When paused, users could not advance a single frame for precise inspection,
+  nor view the effective FPS, and arrow keys on Windows/POSIX terminals were not mapped to camera panning.
+- **Decision**: Add physics options (--relativity, --c-light, --merge, --merge-radius) to the export
+  command and write simulation parameters into export metadata. Extend World.advance, World.advance_to,
+  and TrailRecorder.advance_to with an optional merge_radius parameter resolving collisions at every
+  sub-step. Add single-frame step (. or >) during interactive pause, display live fps in HUD stats,
+  and parse Windows two-byte scan codes and POSIX ANSI sequences for arrow key camera panning.
+- **Consequences**: Scientific data exports match visual simulation physics identically. Paused simulations
+  can be inspected frame-by-frame with zero overshoot. Backward compatibility is fully preserved.

@@ -65,16 +65,24 @@ class TrailRecorder:
                 self.record(world)
         return collisions
 
-    def advance_to(self, world: World, target: float, dt: float, every: int = 1) -> None:
+    def advance_to(self, world: World, target: float, dt: float, every: int = 1,
+                   merge_radius: float = 0.0) -> list[tuple[str, str, str]]:
         if not math.isfinite(target):
             raise ValueError("the target time must be finite")
         if target < world.time - 1e-12:
             raise ValueError("cannot travel backwards in time")
         if every < 1:
             raise ValueError("the sampling interval must be at least one step")
+        collisions: list[tuple[str, str, str]] = []
         while world.time < target - 1e-12:
             remaining = target - world.time
             world.step(dt if remaining > dt else remaining)
+            if merge_radius > 0.0:
+                events = world.resolve_collisions(merge_radius)
+                if events:
+                    collisions.extend(events)
+                    self.sync(world)
             self._steps += 1
             if self._steps % every == 0:
                 self.record(world)
+        return collisions

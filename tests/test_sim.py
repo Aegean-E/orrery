@@ -129,6 +129,21 @@ class WorldTests(unittest.TestCase):
         self.assertAlmostEqual(p0.distance_to(p1), 0.0, places=9)
         self.assertAlmostEqual(cm0.distance_to(cm1), 0.0, places=9)
 
+    def test_advance_and_advance_to_with_merge_radius(self):
+        b1 = Body("Heavy", 10.0, Vec2(0.0, 0.0), Vec2(0.0, 0.0))
+        b2 = Body("Light", 1.0, Vec2(0.02, 0.0), Vec2(0.0, 0.0))
+        world = World((b1, b2), 1e-6)
+        events = world.advance(0.01, 1, merge_radius=0.05)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(len(world.bodies), 1)
+
+        b3 = Body("A", 1.0, Vec2(0.0, 0.0), Vec2(0.0, 0.0))
+        b4 = Body("B", 1.0, Vec2(0.03, 0.0), Vec2(0.0, 0.0))
+        world2 = World((b3, b4), 1e-6)
+        events2 = world2.advance_to(0.02, 0.01, merge_radius=0.05)
+        self.assertEqual(len(events2), 1)
+        self.assertEqual(len(world2.bodies), 1)
+
     def test_invalid_inputs_are_rejected(self):
         body = Body("A", 1.0, Vec2(), Vec2(), "a")
         world = World((body,), 1.0)

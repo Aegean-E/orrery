@@ -27,6 +27,16 @@ class TrailRecorderTests(unittest.TestCase):
         self.assertAlmostEqual(world.time, 2.5)
         self.assertEqual([point.x for point in recorder.trails[0]], [0.0, 1.0, 2.0, 2.5])
 
+    def test_advance_to_resolves_collisions(self):
+        b1 = Body("A", 1.0, Vec2(0.0, 0.0), Vec2(0.0, 0.0))
+        b2 = Body("B", 1.0, Vec2(0.02, 0.0), Vec2(0.0, 0.0))
+        world = World((b1, b2), 1e-6)
+        recorder = TrailRecorder(world, 10)
+        collisions = recorder.advance_to(world, 0.02, 0.01, merge_radius=0.05)
+        self.assertEqual(len(collisions), 1)
+        self.assertEqual(len(world.bodies), 1)
+        self.assertEqual(len(recorder.trails), 1)
+
     def test_zero_limit_disables_history(self):
         world = self._world()
         recorder = TrailRecorder(world, 0)
