@@ -2,40 +2,16 @@
   "version": 1,
   "active_task": {
     "task_id": "orrery-web-launcher",
-    "last_phase": "phase 4",
-    "active_phase": 4,
-    "status": "in_progress",
-    "updated_at": 1792869564.547669,
+    "last_phase": "phase 5",
+    "active_phase": 5,
+    "status": "completed",
+    "updated_at": 1792869716.0014188,
     "owner": "kilo:v10",
     "started_by": "kilo:v10",
-    "continuations": []
+    "continuations": [],
+    "completed_at": 1792869716.214807
   },
   "checkpoints": [
-    {
-      "task_id": "orrery-v7",
-      "phase": "phase 2",
-      "phase_num": 2,
-      "description": "Decomposition into 6 milestones: [1/6] Coulomb force in sim, [2/6] Elastic bounce collisions, [3/6] Atomic & relativistic scenarios, [4/6] CLI options & KE/PE HUD, [5/6] Comprehensive tests, [6/6] Docs & ADR-009",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792859375.758077,
-      "timestamp_str": "2026-10-24 19:29:35"
-    },
-    {
-      "task_id": "orrery-v7",
-      "phase": "phase 4",
-      "phase_num": 4,
-      "description": "[6/6] Implemented elastic bounce collisions, Coulomb electrostatic force, atomic/relativistic scenarios, energy metrics and live telemetry HUD; 113 tests pass; 5/5 gates pass; checklists: passed",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792860310.340655,
-      "timestamp_str": "2026-10-24 19:45:10",
-      "handoff": {
-        "state": "all source and tests verified",
-        "next": "commit changes and check --strict",
-        "evidence": "113 tests passed, 5/5 gates passed"
-      }
-    },
     {
       "task_id": "orrery-v7",
       "phase": "completed",
@@ -290,6 +266,27 @@
         "next": "commit staged launchers plus docs/tests, then strict check and push",
         "evidence": "141 tests, 5/5 gates, curl config response"
       }
+    },
+    {
+      "task_id": "orrery-web-launcher",
+      "phase": "phase 5",
+      "phase_num": 5,
+      "description": "[3/3] Delivered: commit 00c204e, 141 tests, 5/5 gates pass; checklists: passed",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792869716.0014188,
+      "timestamp_str": "2026-10-24 22:21:55",
+      "agent": "kilo:v10"
+    },
+    {
+      "task_id": "orrery-web-launcher",
+      "phase": "completed",
+      "phase_num": 5,
+      "description": "Task 'orrery-web-launcher' completed successfully.",
+      "status": "completed",
+      "timestamp": 1792869716.214809,
+      "timestamp_str": "2026-10-24 22:21:56",
+      "agent": "kilo:v10"
     }
   ]
 }
