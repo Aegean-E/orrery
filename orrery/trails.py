@@ -77,24 +77,45 @@ class TrailRecorder:
                    restitution: float = 1.0) -> list[tuple[str, ...]]:
         if not math.isfinite(target):
             raise ValueError("the target time must be finite")
-        if target < world.time - 1e-12:
-            raise ValueError("cannot travel backwards in time")
+        if not math.isfinite(dt) or dt == 0.0:
+            raise ValueError("the time step must be a non-zero finite number")
         if every < 1:
             raise ValueError("the sampling interval must be at least one step")
         collisions: list[tuple[str, ...]] = []
-        while world.time < target - 1e-12:
-            remaining = target - world.time
-            world.step(dt if remaining > dt else remaining)
-            if merge_radius > 0.0:
-                events = world.resolve_collisions(merge_radius)
-                if events:
-                    collisions.extend(events)
-                    self.sync(world)
-            if bounce_radius > 0.0:
-                bounce_events = world.resolve_elastic_collisions(bounce_radius, restitution)
-                if bounce_events:
-                    collisions.extend(bounce_events)
-            self._steps += 1
-            if self._steps % every == 0:
-                self.record(world)
+        if dt > 0.0:
+            if target < world.time - 1e-12:
+                raise ValueError("cannot travel backwards in time with a positive dt")
+            while world.time < target - 1e-12:
+                remaining = target - world.time
+                world.step(dt if remaining > dt else remaining)
+                if merge_radius > 0.0:
+                    events = world.resolve_collisions(merge_radius)
+                    if events:
+                        collisions.extend(events)
+                        self.sync(world)
+                if bounce_radius > 0.0:
+                    bounce_events = world.resolve_elastic_collisions(bounce_radius, restitution)
+                    if bounce_events:
+                        collisions.extend(bounce_events)
+                self._steps += 1
+                if self._steps % every == 0:
+                    self.record(world)
+        else:
+            if target > world.time + 1e-12:
+                raise ValueError("cannot travel forwards in time with a negative dt")
+            while world.time > target + 1e-12:
+                remaining = target - world.time
+                world.step(dt if remaining < dt else remaining)
+                if merge_radius > 0.0:
+                    events = world.resolve_collisions(merge_radius)
+                    if events:
+                        collisions.extend(events)
+                        self.sync(world)
+                if bounce_radius > 0.0:
+                    bounce_events = world.resolve_elastic_collisions(bounce_radius, restitution)
+                    if bounce_events:
+                        collisions.extend(bounce_events)
+                self._steps += 1
+                if self._steps % every == 0:
+                    self.record(world)
         return collisions

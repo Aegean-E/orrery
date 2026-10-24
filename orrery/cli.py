@@ -503,7 +503,8 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
                    paused: bool = False,
                    camera_label: str | None = None,
                    fps: float | None = None,
-                   dot_char: str | None = None) -> str:
+                   dot_char: str | None = None,
+                   time_warp: float | None = None) -> str:
     bar = "-" * viewport.width if ascii_only else "─" * viewport.width
     separator = " | " if ascii_only else " · "
     drift_label = "dE/E" if ascii_only else "ΔE/E"
@@ -522,6 +523,8 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
     ]
     if fps is not None:
         stats.append(f"fps = {fps:.1f}")
+    if time_warp is not None and (abs(time_warp - 1.0) > 0.01 or time_warp < 0):
+        stats.append(f"warp = {time_warp:+.1f}x")
     if camera_label:
         stats.append(f"cam: {camera_label}")
     lines.extend(_pack_tokens(stats, viewport.width, separator="    "))
@@ -560,12 +563,12 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
             legend.append(f"{body.symbol} {body.name}")
     lines.extend(_pack_tokens(legend, viewport.width))
     if controls_hint:
-        hint_text = "[Space] Pause  [.] Step  [f] Track  [WASD] Pan  [[]] Zoom  [{}] Aspect  [b] Dots  [n/p] World  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
+        hint_text = "[Space] Pause  [.] Step  [z/x] Time  [v] Rev  [f] Track  [WASD] Pan  [[]] Zoom  [{}] Aspect  [b] Dots  [n/p] World  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
         if len(hint_text) <= viewport.width:
             lines.append(hint_text)
         else:
             lines.extend(_pack_tokens([
-                "[Space] Pause", "[.] Step", "[f] Track", "[WASD] Pan", "[[]] Zoom",
+                "[Space] Pause", "[.] Step", "[z/x] Time", "[v] Rev", "[f] Track", "[WASD] Pan", "[[]] Zoom",
                 "[{}] Aspect", "[b] Dots", "[n/p] World", "[C] Clear", "[R] Reset",
                 "[T] Telemetry", "[Q] Quit",
             ], viewport.width, separator="  "))
@@ -613,6 +616,22 @@ def _validate_physics_args(args: argparse.Namespace) -> None:
             "pass a value between 0.0 (inelastic) and 1.0 (elastic).",
             code=2,
         )
+    dt_val = getattr(args, "dt", None)
+    if dt_val is not None and (not math.isfinite(dt_val) or dt_val <= 0.0):
+        raise CliError(
+            f"--dt {dt_val} is not a valid time step.",
+            "the time step must be a positive finite number.",
+            "pass a positive number like --dt 0.01",
+            code=2,
+        )
+    time_scale = getattr(args, "time_scale", None)
+    if time_scale is not None and (not math.isfinite(time_scale) or time_scale <= 0.0):
+        raise CliError(
+            f"--time-scale {time_scale} is not a valid multiplier.",
+            "the time scale must be a positive finite number.",
+            "pass a positive number like --time-scale 2.0",
+            code=2,
+        )
 
 
 def _simulate(scenario: Scenario, target: float, trail_limit: int,
@@ -620,15 +639,18 @@ def _simulate(scenario: Scenario, target: float, trail_limit: int,
               k_coulomb_override: float | None = None,
               merge_radius: float = 0.0,
               bounce_radius: float = 0.0,
-              restitution: float = 1.0) -> tuple[World, TrailRecorder, float]:
+              restitution: float = 1.0,
+              dt_override: float | None = None) -> tuple[World, TrailRecorder, float]:
+    dt = dt_override if dt_override is not None else scenario.dt
     c_val = c_override if c_override is not None else (scenario.c if relativity else None)
     k_val = k_coulomb_override if k_coulomb_override is not None else scenario.k_e
     world = World(scenario.bodies, scenario.g, c=c_val, k_e=k_val)
     initial_energy = world.total_energy()
     recorder = TrailRecorder(world, trail_limit)
-    recorder.advance_to(world, target, scenario.dt, scenario.record_every,
-                        merge_radius=merge_radius, bounce_radius=bounce_radius,
-                        restitution=restitution)
+    if abs(target) > 1e-12:
+        recorder.advance_to(world, target, dt, scenario.record_every,
+                            merge_radius=merge_radius, bounce_radius=bounce_radius,
+                            restitution=restitution)
     return world, recorder, initial_energy
 
 
@@ -658,11 +680,17 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
     merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
     bounce_radius = getattr(args, "bounce_radius", 0.0) if getattr(args, "bounce", False) else 0.0
     restitution = getattr(args, "restitution", 1.0)
+    dt_val = getattr(args, "dt", None)
+    sim_dt = dt_val if dt_val is not None else scenario.dt
+    reverse = getattr(args, "reverse", False)
+    target = -args.at if (reverse and args.at > 0) else args.at
+    step_dt = -sim_dt if reverse else sim_dt
 
     world, recorder, initial_energy = _simulate(
-        scenario, args.at, _trail_limit(args, scenario),
+        scenario, target, _trail_limit(args, scenario),
         relativity=relativity, c_override=c_override, k_coulomb_override=k_coulomb,
         merge_radius=merge_radius, bounce_radius=bounce_radius, restitution=restitution,
+        dt_override=step_dt,
     )
     viewport = _viewport(scenario, width, height, _aspect(args))
     color = _color_enabled(args)
@@ -757,11 +785,18 @@ def _cmd_run(args: argparse.Namespace) -> int:
     merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
     bounce_radius = getattr(args, "bounce_radius", 0.0) if getattr(args, "bounce", False) else 0.0
     restitution = getattr(args, "restitution", 1.0)
+    dt_arg = getattr(args, "dt", None)
+    base_dt = dt_arg if dt_arg is not None else scenario.dt
+    time_scale = getattr(args, "time_scale", 1.0)
+    initial_time_scale = time_scale
+    time_direction = -1.0 if getattr(args, "reverse", False) else 1.0
+    initial_time_direction = time_direction
 
     world, recorder, initial_energy = _simulate(
         scenario, 0.0, _trail_limit(args, scenario),
         relativity=relativity, c_override=c_override, k_coulomb_override=k_coulomb,
         merge_radius=merge_radius, bounce_radius=bounce_radius, restitution=restitution,
+        dt_override=base_dt,
     )
     initial_momentum = world.angular_momentum()
     energy_history: list[float] = [world.energy_drift(initial_energy)]
@@ -818,12 +853,21 @@ def _cmd_run(args: argparse.Namespace) -> int:
                             k_coulomb_override=k_coulomb,
                             merge_radius=merge_radius, bounce_radius=bounce_radius,
                             restitution=restitution,
+                            dt_override=base_dt,
                         )
                         initial_momentum = world.angular_momentum()
                         energy_history = [world.energy_drift(initial_energy)]
                         zoom_factor = 1.0
                         pan_offset = Vec2()
                         tracking_index = None
+                        time_scale = initial_time_scale
+                        time_direction = initial_time_direction
+                    elif key in ("x", "X"):
+                        time_scale = min(100.0, round(time_scale * 1.5, 2))
+                    elif key in ("z", "Z"):
+                        time_scale = max(0.01, round(time_scale / 1.5, 2))
+                    elif key in ("v", "V"):
+                        time_direction = -time_direction
                     elif key in ("t", "T"):
                         telemetry_enabled = not telemetry_enabled
                     elif key in ("h", "?"):
@@ -843,6 +887,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         zoom_factor = 1.0
                         aspect = initial_aspect
                         dot_style = initial_dot_style
+                        time_scale = initial_time_scale
+                        time_direction = initial_time_direction
                     elif key in "123456789":
                         digit = int(key) - 1
                         if digit < len(world.bodies):
@@ -870,12 +916,14 @@ def _cmd_run(args: argparse.Namespace) -> int:
                             step = 1 if key in ("n", "N") else -1
                             scenario_idx = (scenario_idx + step) % len(catalog)
                         scenario = get_scenario(catalog[scenario_idx])
+                        base_dt = dt_arg if dt_arg is not None else scenario.dt
                         world, recorder, initial_energy = _simulate(
                             scenario, 0.0, _trail_limit(args, scenario),
                             relativity=relativity, c_override=c_override,
                             k_coulomb_override=k_coulomb,
                             merge_radius=merge_radius, bounce_radius=bounce_radius,
                             restitution=restitution,
+                            dt_override=base_dt,
                         )
                         initial_momentum = world.angular_momentum()
                         energy_history = [world.energy_drift(initial_energy)]
@@ -888,7 +936,15 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     break
 
                 if not paused or single_step:
-                    recorder.advance(world, scenario.dt, scenario.steps_per_frame,
+                    eff_scale = time_scale
+                    eff_direction = time_direction
+                    if scenario.steps_per_frame * eff_scale >= 1.0:
+                        eff_steps = max(1, round(scenario.steps_per_frame * eff_scale))
+                        eff_dt = base_dt * eff_direction
+                    else:
+                        eff_steps = 1
+                        eff_dt = base_dt * eff_scale * eff_direction
+                    recorder.advance(world, eff_dt, eff_steps,
                                      scenario.record_every, merge_radius=merge_radius,
                                      bounce_radius=bounce_radius, restitution=restitution)
                     frame_index += 1
@@ -940,6 +996,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     camera_label=camera_label,
                     fps=fps,
                     dot_char=dot_char,
+                    time_warp=time_direction * time_scale,
                 ) + "\n")
                 sys.stdout.flush()
                 if frames == 0 or frame_index < frames:
@@ -1025,6 +1082,14 @@ def _cmd_export(args: argparse.Namespace) -> int:
     merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
     bounce_radius = getattr(args, "bounce_radius", 0.0) if getattr(args, "bounce", False) else 0.0
     restitution = getattr(args, "restitution", 1.0)
+    dt_arg = getattr(args, "dt", None)
+    base_dt = dt_arg if dt_arg is not None else scenario.dt
+    reverse = getattr(args, "reverse", False)
+    if reverse:
+        targets = [-t for t in targets]
+        step_dt = -base_dt
+    else:
+        step_dt = base_dt
 
     metadata = _catalog_payload(scenario)
     metadata["export"] = {
@@ -1042,6 +1107,10 @@ def _cmd_export(args: argparse.Namespace) -> int:
     if bounce_radius > 0.0:
         metadata["export"]["bounce_radius"] = bounce_radius
         metadata["export"]["restitution"] = restitution
+    if dt_arg is not None:
+        metadata["export"]["dt"] = base_dt
+    if reverse:
+        metadata["export"]["reverse"] = True
 
     world = World(scenario.bodies, scenario.g, c=c_val, k_e=k_val)
     temporary: Path | None = None
@@ -1056,7 +1125,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
                 writer = csv.writer(handle)
                 writer.writerow(["time", "body", "x", "y", "vx", "vy", "speed"])
                 for target in targets:
-                    world.advance_to(target, scenario.dt, merge_radius=merge_radius,
+                    world.advance_to(target, step_dt, merge_radius=merge_radius,
                                      bounce_radius=bounce_radius, restitution=restitution)
                     for body in world.bodies:
                         writer.writerow([
@@ -1074,7 +1143,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
                 handle.write(',\n  "samples": [')
                 first = True
                 for target in targets:
-                    world.advance_to(target, scenario.dt, merge_radius=merge_radius,
+                    world.advance_to(target, step_dt, merge_radius=merge_radius,
                                      bounce_radius=bounce_radius, restitution=restitution)
                     sample = {
                         "time": world.time,
@@ -1159,6 +1228,26 @@ def _add_physics_options(parser: argparse.ArgumentParser) -> None:
                         help="coefficient of restitution for elastic bounce (0.0 to 1.0, default: 1.0)")
 
 
+def _add_time_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--dt", type=float, default=None,
+                        help="integration time step override (positive number)")
+    parser.add_argument("--time-scale", "--warp", dest="time_scale", type=float, default=1.0,
+                        help="simulation time rate multiplier (default: 1.0)")
+    parser.add_argument("--reverse", action="store_true",
+                        help="run simulation backward in time")
+
+
+def _cmd_web(args: argparse.Namespace) -> int:
+    from .web import run_server
+    return run_server(
+        port=args.port,
+        host=args.host,
+        initial_scenario=args.key,
+        auto_open=not args.no_open,
+        once=args.once,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = TriadParser(
         prog="orrery",
@@ -1192,6 +1281,7 @@ def build_parser() -> argparse.ArgumentParser:
                           help="display live energy drift trend in footer")
     _add_view_options(snapshot, trails=True)
     _add_physics_options(snapshot)
+    _add_time_options(snapshot)
     snapshot.set_defaults(handler=_cmd_snapshot)
 
     run = commands.add_parser("run", help="animate a scenario in the terminal")
@@ -1207,6 +1297,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="disable interactive keyboard controls")
     _add_view_options(run, trails=True)
     _add_physics_options(run)
+    _add_time_options(run)
     run.set_defaults(handler=_cmd_run)
 
     export = commands.add_parser("export", help="write sampled positions to CSV")
@@ -1219,7 +1310,23 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--every", type=float, default=None,
                         help="sampling interval in simulation time")
     _add_physics_options(export)
+    _add_time_options(export)
     export.set_defaults(handler=_cmd_export)
+
+    web = commands.add_parser("web", help="launch the interactive browser-based Web UI")
+    web.add_argument("key", nargs="?", default="solar",
+                     help="initial scenario key, alias, or .json file (default: solar)")
+    web.add_argument("--port", type=int, default=8000,
+                     help="HTTP server port (default: 8000)")
+    web.add_argument("--host", default="127.0.0.1",
+                     help="HTTP server host interface (default: 127.0.0.1)")
+    web.add_argument("--no-open", action="store_true",
+                     help="do not automatically launch the web browser")
+    web.add_argument("--once", action="store_true",
+                     help="handle one request and exit (for automated testing)")
+    _add_physics_options(web)
+    _add_time_options(web)
+    web.set_defaults(handler=_cmd_web)
     return parser
 
 

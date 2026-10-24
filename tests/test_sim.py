@@ -222,6 +222,39 @@ class WorldTests(unittest.TestCase):
         self.assertAlmostEqual(world.momentum().distance_to(p0), 0.0, places=6)
         self.assertAlmostEqual(world.center_of_mass().distance_to(cm0), 0.0, places=6)
 
+    def test_time_reversible_leapfrog(self):
+        b1 = Body("A", 1.0, Vec2(0.5, 0.2), Vec2(-0.1, 0.4))
+        b2 = Body("B", 2.0, Vec2(-0.8, -0.3), Vec2(0.2, -0.2))
+        world = World((b1, b2), g=1.5)
+        pos0 = [b.pos for b in world.bodies]
+        vel0 = [b.vel for b in world.bodies]
+
+        # Integrate forward 100 steps
+        for _ in range(100):
+            world.step(0.005)
+        self.assertAlmostEqual(world.time, 0.5, places=6)
+
+        # Integrate backward 100 steps with -dt
+        for _ in range(100):
+            world.step(-0.005)
+        self.assertAlmostEqual(world.time, 0.0, places=6)
+
+        # Symplectic reversibility restores exact phase space coordinates
+        for i in range(len(world.bodies)):
+            self.assertLess(world.bodies[i].pos.distance_to(pos0[i]), 1e-10)
+            self.assertLess(world.bodies[i].vel.distance_to(vel0[i]), 1e-10)
+
+    def test_advance_and_advance_to_backward_in_time(self):
+        b = Body("P", 1.0, Vec2(1.0, 0.0), Vec2(0.0, 1.0))
+        world = World((b,), g=1.0)
+        # Advance forward to 2.0
+        world.advance_to(2.0, 0.1)
+        self.assertAlmostEqual(world.time, 2.0, places=6)
+
+        # Advance backward to 0.5
+        world.advance_to(0.5, -0.1)
+        self.assertAlmostEqual(world.time, 0.5, places=6)
+
 
 if __name__ == "__main__":
     unittest.main()

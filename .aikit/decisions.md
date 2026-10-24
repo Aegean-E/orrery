@@ -140,3 +140,19 @@ contract, a dependency, a data format or the architecture; IDs are consecutive a
   `bohr` (semi-classical planetary atom), and `black-hole` (relativistic singularity with rosette precession).
 - **Consequences**: Orrery models gravitational, relativistic, and subatomic electrostatic physics
   seamlessly in a single zero-dependency engine with full CLI and export parity.
+
+
+### ADR-010: Simulation time settings and zero-dependency Web-based UI
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**: Users requested comprehensive temporal control (configurable dt, time warp scale,
+  reverse integration direction) and a companion Web-based UI while preserving the terminal UI completely.
+- **Decision**: Extend kick-drift-kick leapfrog with negative dt support (time-reversible symplectic
+  symmetry), allowing backward integration to retrace orbits identically. Add CLI time options
+  (`--dt`, `--time-scale` / `--warp`, `--reverse`) and interactive terminal keybindings (`x` for faster
+  warp, `z` for slower warp, `v` to reverse direction). Implement a zero-dependency HTTP server in
+  `orrery/web.py` using Python's standard `http.server`, serving an embedded HTML5 Canvas 2D orbital
+  studio (`python -m orrery web`) with real-time physics, camera panning/zooming, body tracking,
+  time controls, live telemetry, and custom scenario JSON drag-and-drop loading.
+- **Consequences**: Users can explore simulations interactively both in the terminal and in any modern
+  web browser without installing any external packages or npm dependencies.

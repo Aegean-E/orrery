@@ -105,26 +105,27 @@ Aliases are forgiving: `inner`, `inner-solar-system`, `solar-system`, `figure-8`
 python -m orrery list [--json]
 python -m orrery info KEY|FILE [--json]
 python -m orrery validate FILE
-python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
-python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
-python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E]
+python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--dt DT] [--reverse] [--telemetry] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--dt DT] [--time-scale SCALE] [--reverse] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME] [--dt DT] [--reverse] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E]
+python -m orrery web [KEY|FILE] [--port PORT] [--host HOST] [--no-open]
 ```
 
+- `web` starts the zero-dependency browser-based studio at `http://127.0.0.1:8000/` and opens your default browser. Features interactive HTML5/Canvas 2D rendering, time settings (warp slider, reverse, dt), camera panning/zooming, body tracking, live telemetry charts, and custom JSON scenario drag-and-drop.
 - `list --json` emits the scenario catalogue with units, extents and initial bodies.
 - `snapshot` integrates to `--at` and prints one frame. With no `--at` you get the initial state.
-  A snapshot above 2,000,000 integration steps is refused unless you pass `--force`.
+  A snapshot above 2,000,000 integration steps is refused unless you pass `--force`. `--reverse` and `--dt` allow fine-grained backward and custom step snapshots.
 - `run` loops on a terminal; `--frames 0` loops forever, and a piped run defaults to one still.
   Frame rates are limited to `0.1`–`240` fps so a typo cannot sleep for years. `--aspect` overrides
   the assumed 2:1 character-cell ratio when your font or terminal differs.
-  Interactive keyboard controls on terminals: Space pauses/resumes, . steps one frame while paused, f or 1-9 tracks bodies, WASD or arrow keys pan, [ or ] zoom, { or } calibrates aspect ratio, b cycles orbit dot styles (circle, bullet, ring, disc, dot, ascii, braille), 0 resets camera and aspect, n or p cycles scenarios, +/- adjusts speed, c clears trails, r resets simulation, t toggles live telemetry HUD (displaying energy drift sparkline, momentum drift, K, U, and Virial theorem 2K+U metric), and q quits.
+  Interactive keyboard controls on terminals: Space pauses/resumes, . steps one frame while paused, z/x decreases/increases time warp, v reverses time direction, f or 1-9 tracks bodies, WASD or arrow keys pan, [ or ] zoom, { or } calibrates aspect ratio, b cycles orbit dot styles (circle, bullet, ring, disc, dot, ascii, braille), 0 resets camera and time settings, n or p cycles scenarios, +/- adjusts speed, c clears trails, r resets simulation, t toggles live telemetry HUD (displaying energy drift sparkline, momentum drift, K, U, and Virial theorem 2K+U metric), and q quits.
 - `info` prints initial distances, osculating orbital elements and energy. `--json` is stable and
   machine-readable. If no single body dominates (the figure-eight and binary worlds), the
   two-body orbit columns are deliberately blank rather than misleading.
 - `validate` checks a custom JSON scenario without rendering or advancing it.
 - `export` writes CSV rows (`time,body,x,y,vx,vy,speed`) or a JSON document with scenario metadata,
-  export settings and per-body samples, in the scenario's native units. The final state is always
-  included, even when `--every` is larger than `--until`. It streams through a temporary file and
-  atomically replaces the target when complete; the sample count is capped at 200,000.
+  export settings and per-body samples, in the scenario's native units. Supports `--dt` and `--reverse`.
+  It streams through a temporary file and atomically replaces the target when complete; the sample count is capped at 200,000.
 
 Every failure follows the same triad:
 

@@ -160,8 +160,8 @@ class World:
 
     def step(self, dt: float) -> None:
         """Advance one kick-drift-kick leapfrog step of length ``dt``."""
-        if not math.isfinite(dt) or dt <= 0.0:
-            raise ValueError("the time step must be a positive finite number")
+        if not math.isfinite(dt) or dt == 0.0:
+            raise ValueError("the time step must be a non-zero finite number")
         half = dt * 0.5
         start = _accelerations(self.bodies, self.g, self.c, self.k_e)
         drifted = tuple(
@@ -276,20 +276,37 @@ class World:
         """Integrate to ``target``, ending with a shorter step when needed."""
         if not math.isfinite(target):
             raise ValueError("the target time must be finite")
-        if target < self.time - 1e-12:
-            raise ValueError("cannot travel backwards in time")
+        if not math.isfinite(dt) or dt == 0.0:
+            raise ValueError("the time step must be a non-zero finite number")
         events: list[tuple[str, ...]] = []
-        while self.time < target - 1e-12:
-            remaining = target - self.time
-            self.step(dt if remaining > dt else remaining)
-            if merge_radius > 0.0:
-                step_events = self.resolve_collisions(merge_radius)
-                if step_events:
-                    events.extend(step_events)
-            if bounce_radius > 0.0:
-                bounce_events = self.resolve_elastic_collisions(bounce_radius, restitution)
-                if bounce_events:
-                    events.extend(bounce_events)
+        if dt > 0.0:
+            if target < self.time - 1e-12:
+                raise ValueError("cannot travel backwards in time with a positive dt")
+            while self.time < target - 1e-12:
+                remaining = target - self.time
+                self.step(dt if remaining > dt else remaining)
+                if merge_radius > 0.0:
+                    step_events = self.resolve_collisions(merge_radius)
+                    if step_events:
+                        events.extend(step_events)
+                if bounce_radius > 0.0:
+                    bounce_events = self.resolve_elastic_collisions(bounce_radius, restitution)
+                    if bounce_events:
+                        events.extend(bounce_events)
+        else:
+            if target > self.time + 1e-12:
+                raise ValueError("cannot travel forwards in time with a negative dt")
+            while self.time > target + 1e-12:
+                remaining = target - self.time
+                self.step(dt if remaining < dt else remaining)
+                if merge_radius > 0.0:
+                    step_events = self.resolve_collisions(merge_radius)
+                    if step_events:
+                        events.extend(step_events)
+                if bounce_radius > 0.0:
+                    bounce_events = self.resolve_elastic_collisions(bounce_radius, restitution)
+                    if bounce_events:
+                        events.extend(bounce_events)
         return events
 
     @property

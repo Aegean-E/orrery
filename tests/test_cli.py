@@ -444,6 +444,52 @@ class InteractiveAndTelemetryTests(unittest.TestCase):
             self.assertEqual(export_meta["bounce_radius"], 0.05)
             self.assertEqual(export_meta["restitution"], 0.85)
 
+    def test_cli_time_options_dt_and_reverse(self):
+        code, output = run_cli("snapshot", "solar", "--dt", "0.05", "--reverse",
+                               "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertIn("ORRERY |", output)
+
+    def test_cli_time_options_warp(self):
+        code, output = run_cli("snapshot", "solar", "--warp", "2.5",
+                               "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertIn("ORRERY |", output)
+
+    def test_cli_invalid_time_args(self):
+        code, output = run_cli("snapshot", "solar", "--dt", "-0.1")
+        self.assertEqual(code, 2)
+        self.assertIn("--dt", output)
+
+        code, output = run_cli("snapshot", "solar", "--time-scale", "0.0")
+        self.assertEqual(code, 2)
+        self.assertIn("--time-scale", output)
+
+    def test_run_interactive_time_keys(self):
+        # Keys: 'x' (faster), 'z' (slower), 'v' (reverse), 'q' (quit)
+        keys = iter(["x", "z", "v", "q"])
+
+        def fake_poll(self):
+            return next(keys, None)
+
+        with mock.patch.object(KeyboardReader, "poll", fake_poll):
+            with mock.patch("sys.stdout.isatty", return_value=True):
+                with mock.patch("sys.stdin.isatty", return_value=True):
+                    code, output = run_cli("run", "solar", "--frames", "0",
+                                           "--ascii", "--no-color")
+                    self.assertEqual(code, 0)
+                    self.assertIn("Stopped at t =", output)
+
+    def test_cli_web_subcommand_help(self):
+        stdout = io.StringIO()
+        with self.assertRaises(SystemExit) as caught:
+            with contextlib.redirect_stdout(stdout):
+                main(["web", "--help"])
+        self.assertEqual(caught.exception.code, 0)
+        output = stdout.getvalue()
+        self.assertIn("--port", output)
+        self.assertIn("--no-open", output)
+
 
 if __name__ == "__main__":
     unittest.main()

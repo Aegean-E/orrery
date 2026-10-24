@@ -6,11 +6,11 @@
 ---
 
 ## 📊 Codebase Metrics
-- **Total Python Modules**: `18`
-- **Total Classes**: `26`
-- **Total Top-Level Functions**: `67`
-- **Total Class Methods**: `166`
-- **Total Source Lines**: `4081`
+- **Total Python Modules**: `20`
+- **Total Classes**: `28`
+- **Total Top-Level Functions**: `72`
+- **Total Class Methods**: `188`
+- **Total Source Lines**: `5546`
 
 ---
 
@@ -33,7 +33,7 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `1244` lines (`53408` bytes)
+**Size**: `1351` lines (`58420` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
@@ -68,15 +68,17 @@
 - `def _cmd_list(args)`
 - `def _cmd_info(args)`
 - `def _sparkline(values, width, *, ascii_only)` - *Render a compact sparkline trend string for a series of numeric samples.*
-- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused, camera_label, fps, dot_char)`
+- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused, camera_label, fps, dot_char, time_warp)`
 - `def _validate_physics_args(args)`
-- `def _simulate(scenario, target, trail_limit, *, relativity, c_override, k_coulomb_override, merge_radius, bounce_radius, restitution)`
+- `def _simulate(scenario, target, trail_limit, *, relativity, c_override, k_coulomb_override, merge_radius, bounce_radius, restitution, dt_override)`
 - `def _cmd_snapshot(args)`
 - `def _enable_windows_ansi()` - *Enable VT processing when possible; return whether ANSI control is safe.*
 - `def _cmd_run(args)`
 - `def _cmd_export(args)`
 - `def _add_view_options(parser, *, trails)`
 - `def _add_physics_options(parser)`
+- `def _add_time_options(parser)`
+- `def _cmd_web(args)`
 - `def build_parser()`
 - `def main(argv)`
 
@@ -159,7 +161,7 @@
 ### [`orrery/sim.py`](orrery/sim.py)
 > *Gravity, bodies and a symplectic leapfrog integrator.*
 
-**Size**: `400` lines (`16194` bytes)
+**Size**: `417` lines (`17136` bytes)
 
 **Classes:**
 - `class Vec2` - *A point or vector in the plane.*
@@ -204,7 +206,7 @@
 ### [`orrery/trails.py`](orrery/trails.py)
 > *Bounded, sampled position history for drawing orbit trails.*
 
-**Size**: `100` lines (`4116` bytes)
+**Size**: `121` lines (`5231` bytes)
 
 **Classes:**
 - `class TrailRecorder` - *Keep one bounded deque of past positions per body, sampled every N steps.*
@@ -218,13 +220,33 @@
 
 ---
 
+### [`orrery/web.py`](orrery/web.py)
+> *Zero-dependency HTTP server and embedded interactive Web-based UI for Orrery.*
+
+**Size**: `1121` lines (`37893` bytes)
+
+**Classes:**
+- `class OrreryHandler` - *HTTP request handler serving the single-page application and JSON APIs.*
+  - Method `.log_message(format, *args)` - *Suppress standard HTTP server access log to keep the terminal tidy.*
+  - Method `._send_json(status, data)`
+  - Method `._send_html(content)`
+  - Method `.do_GET()`
+  - Method `.do_POST()`
+
+**Functions:**
+- `def _scenario_to_dict(scenario_key)`
+- `def _catalog_list()`
+- `def run_server(port, host, initial_scenario, auto_open, once)` - *Run the zero-dependency Orrery Web HTTP server.*
+
+---
+
 ### [`tests/__init__.py`](tests/__init__.py)
 **Size**: `0` lines (`0` bytes)
 
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `449` lines (`20876` bytes)
+**Size**: `495` lines (`22801` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -275,6 +297,11 @@
   - Method `.test_cli_telemetry_hud_energy_decomposition()`
   - Method `.test_cli_invalid_physics_args_rejected()`
   - Method `.test_cli_export_metadata_includes_bounce_and_coulomb()`
+  - Method `.test_cli_time_options_dt_and_reverse()`
+  - Method `.test_cli_time_options_warp()`
+  - Method `.test_cli_invalid_time_args()`
+  - Method `.test_run_interactive_time_keys()`
+  - Method `.test_cli_web_subcommand_help()`
 
 **Functions:**
 - `def run_cli(*argv)`
@@ -387,7 +414,7 @@
 ---
 
 ### [`tests/test_sim.py`](tests/test_sim.py)
-**Size**: `227` lines (`11146` bytes)
+**Size**: `260` lines (`12450` bytes)
 
 **Classes:**
 - `class Vec2Tests`
@@ -408,6 +435,8 @@
   - Method `.test_electrostatic_energy_and_potential()`
   - Method `.test_relativistic_energy_and_schwarzschild_radius()`
   - Method `.test_elastic_bounce_collisions_conservation()`
+  - Method `.test_time_reversible_leapfrog()`
+  - Method `.test_advance_and_advance_to_backward_in_time()`
 
 ---
 
@@ -424,5 +453,23 @@
   - Method `.test_zero_limit_disables_history()`
   - Method `.test_clear_resets_trail_history()`
   - Method `.test_invalid_arguments_are_rejected()`
+
+---
+
+### [`tests/test_web.py`](tests/test_web.py)
+**Size**: `120` lines (`4617` bytes)
+
+**Classes:**
+- `class WebApiTests`
+  - Method `.setUpClass()`
+  - Method `.tearDownClass()`
+  - Method `.test_root_serves_html()`
+  - Method `.test_api_health()`
+  - Method `.test_api_scenarios_catalogue()`
+  - Method `.test_api_scenario_detail()`
+  - Method `.test_api_scenario_not_found()`
+  - Method `.test_api_validate_endpoint()`
+  - Method `.test_internal_helpers()`
+  - Method `.test_run_server_once()`
 
 ---
