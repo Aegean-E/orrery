@@ -1,69 +1,15 @@
 {
   "version": 1,
   "active_task": {
-    "task_id": "orrery-v7",
+    "task_id": "orrery-v8",
     "last_phase": "phase 4",
     "active_phase": 5,
     "status": "completed",
-    "updated_at": 1792860310.340655,
-    "completed_at": 1792860359.5010684
+    "updated_at": 1792861195.8848119,
+    "owner": "unidentified",
+    "completed_at": 1792861222.331314
   },
   "checkpoints": [
-    {
-      "task_id": "orrery-v2",
-      "phase": "phase 4",
-      "phase_num": 4,
-      "description": "[2/2] Implemented Braille trails (ADR-004), Pythagorean scenario, custom JSON validation, golden tests, invariant checks, JSON export, CI workflow; 77 tests pass; 5/5 gates pass; checklists: passed",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792830837.933194,
-      "timestamp_str": "2026-10-24 11:33:57",
-      "handoff": {
-        "state": "all source verified",
-        "next": "commit changes and check --strict",
-        "evidence": "77 tests passed, 5/5 gates passed"
-      }
-    },
-    {
-      "task_id": "orrery-v2",
-      "phase": "phase 5",
-      "phase_num": 5,
-      "description": "[2/2] Delivered: committed 82df8d2, 77 tests and 5/5 strict gates pass; checklists: passed",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792830983.120787,
-      "timestamp_str": "2026-10-24 11:36:23",
-      "handoff": {
-        "state": "delivered",
-        "next": "none",
-        "evidence": "77 tests, 5/5 strict gates, commit 82df8d2"
-      }
-    },
-    {
-      "task_id": "orrery-v2",
-      "phase": "completed",
-      "phase_num": 5,
-      "description": "Task 'orrery-v2' completed successfully.",
-      "status": "completed",
-      "timestamp": 1792830987.3312476,
-      "timestamp_str": "2026-10-24 11:36:27"
-    },
-    {
-      "task_id": "orrery-v3",
-      "phase": "phase 2",
-      "phase_num": 2,
-      "description": "[1/5] Plan: interactive keyboard controls, live telemetry HUD, new orbital choreographies, full test suite and remote push",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792831110.0936575,
-      "timestamp_str": "2026-10-24 11:38:30",
-      "impact_assessment": {
-        "why": "User requested all proposed features: real-time keyboard control during simulation, live telemetry charts, new choreographies, and remote publication.",
-        "benefits": "Transforms Orrery into an interactive terminal simulation toy with instant responsiveness, deep physical insight via live telemetry, and richer worlds.",
-        "risks": "contract: must preserve piped non-interactive CLI parity; dependency: strictly standard library only (msvcrt / select); concurrency: single-threaded non-blocking event loop; state: deterministic resets.",
-        "mitigation": "Wrap keyboard detection in a portable non-blocking reader that degrades gracefully to no-op when non-interactive or unsupported; ensure all tests pass in non-TTY environments."
-      }
-    },
     {
       "task_id": "orrery-v3",
       "phase": "phase 4",
@@ -261,6 +207,63 @@
       "status": "completed",
       "timestamp": 1792860359.5010698,
       "timestamp_str": "2026-10-24 19:45:59"
+    },
+    {
+      "task_id": "orrery-v8",
+      "phase": "phase 1",
+      "phase_num": 1,
+      "description": "Add simulation time settings and a zero-dependency Web-based UI alongside the terminal UI",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792860485.3637695,
+      "timestamp_str": "2026-10-24 19:48:05",
+      "impact_assessment": {
+        "why": "User requested time settings and a companion Web-based UI while keeping the terminal UI.",
+        "benefits": "Gives users precise temporal control in both terminal and browser, with rich Canvas 2D interactive exploration and zero external dependencies.",
+        "risks": "contract: existing CLI must remain 100% backward compatible; dependency: strictly standard library only (http.server); concurrency: clean server shutdown; state: time-reversible leapfrog with negative dt.",
+        "mitigation": "Thorough argument validation, modular web.py, self-contained embedded web UI, and full automated test suite."
+      }
+    },
+    {
+      "task_id": "orrery-v8",
+      "phase": "phase 2",
+      "phase_num": 2,
+      "description": "[1/6] Plan: [1/6] Time settings in sim core & CLI, [2/6] Terminal interactive time controls & HUD, [3/6] Web server module with REST API, [4/6] Embedded HTML5 Canvas Web UI, [5/6] Test suite, [6/6] Docs & ADR-010",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792860490.0389974,
+      "timestamp_str": "2026-10-24 19:48:10",
+      "handoff": {
+        "state": "ledger planned",
+        "next": "implement time settings in sim.py and cli.py",
+        "evidence": "Phase 1 & 2 recorded"
+      }
+    },
+    {
+      "task_id": "orrery-v8",
+      "phase": "phase 4",
+      "phase_num": 4,
+      "description": "[6/6] Implemented simulation time settings (dt, warp, reverse), interactive time controls, and zero-dependency Web-based UI in orrery/web.py; 127 tests pass; 5/5 gates pass; checklists: passed",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792861195.8848119,
+      "timestamp_str": "2026-10-24 19:59:55",
+      "agent": "unidentified",
+      "handoff": {
+        "state": "all source, web UI, and tests verified",
+        "next": "commit changes and check --strict",
+        "evidence": "127 tests passed, 5/5 gates passed"
+      }
+    },
+    {
+      "task_id": "orrery-v8",
+      "phase": "completed",
+      "phase_num": 5,
+      "description": "Task 'orrery-v8' completed successfully.",
+      "status": "completed",
+      "timestamp": 1792861222.331316,
+      "timestamp_str": "2026-10-24 20:00:22",
+      "agent": "unidentified"
     }
   ]
 }
