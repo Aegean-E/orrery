@@ -1,89 +1,17 @@
 {
   "version": 1,
   "active_task": {
-    "task_id": "orrery-v8-polish",
-    "last_phase": "phase 4",
+    "task_id": "orrery-v9-web-parity",
+    "last_phase": "phase 5",
     "active_phase": 5,
     "status": "completed",
-    "updated_at": 1792861573.2090688,
-    "owner": "unidentified",
-    "completed_at": 1792861607.4718447
+    "updated_at": 1792867745.6643615,
+    "owner": "kilo:v9",
+    "started_by": "kilo:v9",
+    "continuations": [],
+    "completed_at": 1792867765.522766
   },
   "checkpoints": [
-    {
-      "task_id": "orrery-v4",
-      "phase": "phase 2",
-      "phase_num": 2,
-      "description": "[1/5] Plan: camera pan/zoom/body tracking, relativistic 1PN precession, collision coalescence mode, interactive scenario switching, and remote push",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792831687.5269089,
-      "timestamp_str": "2026-10-24 11:48:07",
-      "impact_assessment": {
-        "why": "User requested all proposed advanced capabilities: camera control and body tracking, 1PN general relativistic precession, inelastic merger collisions, and live scenario switching.",
-        "benefits": "Elevates Orrery into a full astronomical observatory: study orbits from rotating reference frames (e.g. geocentric epicycles), observe Mercury's precession, simulate planetary accretion, and switch worlds dynamically.",
-        "risks": "contract: default behaviour must remain unchanged; dependency: strictly standard library; concurrency: single-threaded event loop; state: merging modifies body array cleanly.",
-        "mitigation": "Opt-in flags (--relativity, --merge) preserve existing defaults; trail recorder handles dynamic body counts on merger; tests cover all new modes."
-      }
-    },
-    {
-      "task_id": "orrery-v4",
-      "phase": "phase 4",
-      "phase_num": 4,
-      "description": "[4/5] Implemented body tracking camera, WASD pan, zoom, scenario switching (n/p), 1PN relativity, collision merging (ADR-006); 90 tests pass; 5/5 gates pass; checklists: passed",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792832177.3680525,
-      "timestamp_str": "2026-10-24 11:56:17",
-      "handoff": {
-        "state": "all implementation complete",
-        "next": "stage explicitly, commit, verify strict, and push to origin master",
-        "evidence": "90 tests pass, 5/5 gates pass"
-      }
-    },
-    {
-      "task_id": "orrery-v4",
-      "phase": "phase 5",
-      "phase_num": 5,
-      "description": "[5/5] Delivered: committed 0f950a0, 90 tests and 5/5 strict gates pass; checklists: passed",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792832204.3569455,
-      "timestamp_str": "2026-10-24 11:56:44",
-      "handoff": {
-        "state": "delivered",
-        "next": "push to remote",
-        "evidence": "90 tests, 5/5 strict gates, commit 0f950a0"
-      }
-    },
-    {
-      "task_id": "orrery-v4",
-      "phase": "completed",
-      "phase_num": 5,
-      "description": "Task 'orrery-v4' completed successfully.",
-      "status": "completed",
-      "timestamp": 1792832209.5650802,
-      "timestamp_str": "2026-10-24 11:56:49"
-    },
-    {
-      "task_id": "orrery-v5",
-      "phase": "phase 4",
-      "phase_num": 4,
-      "description": "Implement export physics parity, step-by-step collision resolution, paused single-frame step, and arrow key mapping",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792858062.7320294,
-      "timestamp_str": "2026-10-24 19:07:42"
-    },
-    {
-      "task_id": "orrery-v5",
-      "phase": "completed",
-      "phase_num": 5,
-      "description": "Task 'orrery-v5' completed successfully.",
-      "status": "completed",
-      "timestamp": 1792858090.1261024,
-      "timestamp_str": "2026-10-24 19:08:10"
-    },
     {
       "task_id": "orrery-v6",
       "phase": "phase 1",
@@ -263,6 +191,97 @@
       "timestamp": 1792861607.4718459,
       "timestamp_str": "2026-10-24 20:06:47",
       "agent": "unidentified"
+    },
+    {
+      "task_id": "orrery-v9-web-parity",
+      "phase": "phase 1",
+      "phase_num": 1,
+      "description": "Web studio parity: honor initial scenario and CLI physics/time options, make custom scenario uploads usable, and close input-handling gaps",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792865942.96105,
+      "timestamp_str": "2026-10-24 21:19:02",
+      "agent": "kilo:v9",
+      "impact_assessment": {
+        "why": "The new web UI silently ignores 'web KEY' and every physics/time flag, and drag-and-drop validation registers nothing, so the loaded custom scenario cannot be fetched; the upload endpoint also writes a fixed temp file in the working directory and accepts unbounded bodies.",
+        "benefits": "Browser and terminal share one selection and physics contract; custom scenarios load end-to-end; request handling is safe and deterministic.",
+        "risks": "contract: default web behaviour must remain unchanged for callers of run_server; dependency: standard library only; concurrency: registry shared across threaded requests; state: no files left in the working tree.",
+        "mitigation": "Optional WebOptions with defaults, a locked per-server registry, tempfile.TemporaryDirectory, bounded Content-Length, and regression tests for the old defaults and new flags."
+      }
+    },
+    {
+      "task_id": "orrery-v9-web-parity",
+      "phase": "phase 2",
+      "phase_num": 2,
+      "description": "[1/5] Plan: server state and /api/config, [2/5] CLI option plumbing and safe custom registry, [3/5] browser config/upload/XSS fixes, [4/5] regression tests, [5/5] README and ADR-011",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792865962.3233016,
+      "timestamp_str": "2026-10-24 21:19:22",
+      "agent": "kilo:v9",
+      "handoff": {
+        "state": "ledger planned",
+        "next": "implement web.py server state and config endpoint",
+        "evidence": "phase 1 recorded"
+      }
+    },
+    {
+      "task_id": "orrery-v9-web-parity",
+      "phase": "phase 4",
+      "phase_num": 4,
+      "description": "[5/5] Web studio now honors web KEY|FILE and all physics/time flags via /api/config and WebOptions; uploaded scenarios are registered under non-shadowing keys with a 1 MiB cap and tempdir validation; client applies overrides, updates labels, and renders body rows without innerHTML; 136 tests pass; 5/5 gates pass; checklists: passed",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792867254.152304,
+      "timestamp_str": "2026-10-24 21:40:54",
+      "agent": "kilo:v9",
+      "handoff": {
+        "state": "all source, web UI, docs, ADR-011 and tests verified",
+        "next": "commit the 8 modified files and run check --strict",
+        "evidence": "136 tests, 5/5 gates, ruff clean"
+      }
+    },
+    {
+      "task_id": "orrery-v9-web-parity",
+      "phase": "phase 4",
+      "phase_num": 4,
+      "description": "[5/5] Review fixes: sliders widen instead of clamping overrides, non-finite floats become null in responses, invalid worlds return 400, oversize drain is guarded; added run_server wiring and JSON sanitizer tests; 138 tests pass; 5/5 gates pass; checklists: passed",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792867707.9546049,
+      "timestamp_str": "2026-10-24 21:48:27",
+      "agent": "kilo:v9",
+      "handoff": {
+        "state": "verified and delivery-ready pending commit",
+        "next": "commit source+tests, then docs+ledger",
+        "evidence": "138 tests, ruff clean, 5/5 gates"
+      }
+    },
+    {
+      "task_id": "orrery-v9-web-parity",
+      "phase": "phase 5",
+      "phase_num": 5,
+      "description": "[5/5] Delivered: feature commit cb7936f, 138 tests, 5/5 gates pass; checklists: passed",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792867745.6643615,
+      "timestamp_str": "2026-10-24 21:49:05",
+      "agent": "kilo:v9",
+      "handoff": {
+        "state": "delivered",
+        "next": "verify strict against committed tree and push to origin/master",
+        "evidence": "cb7936f, 138 tests, 5/5 gates"
+      }
+    },
+    {
+      "task_id": "orrery-v9-web-parity",
+      "phase": "completed",
+      "phase_num": 5,
+      "description": "Task 'orrery-v9-web-parity' completed successfully.",
+      "status": "completed",
+      "timestamp": 1792867765.5227675,
+      "timestamp_str": "2026-10-24 21:49:25",
+      "agent": "kilo:v9"
     }
   ]
 }
