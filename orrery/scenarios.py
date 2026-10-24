@@ -39,12 +39,15 @@ class Scenario:
     mass_unit: str
     speed_unit: str
     speed_scale: float
+    c: float | None = None
 
     def __post_init__(self) -> None:
         if not self.key or not self.title or not self.description:
             raise ValueError("a scenario needs a key, title and description")
         if not math.isfinite(self.g) or self.g <= 0.0:
             raise ValueError(f"scenario '{self.key}' needs a positive finite G")
+        if self.c is not None and (not math.isfinite(self.c) or self.c <= 0.0):
+            raise ValueError(f"scenario '{self.key}' needs a positive finite speed of light")
         if not math.isfinite(self.dt) or self.dt <= 0.0:
             raise ValueError(f"scenario '{self.key}' needs a positive finite time step")
         if not math.isfinite(self.span) or self.span <= 0.0:
@@ -150,6 +153,7 @@ def _solar() -> Scenario:
         mass_unit="Msun",
         speed_unit="km/s",
         speed_scale=AU_PER_DAY_TO_KM_PER_S,
+        c=173.1446,
     )
 
 
@@ -186,6 +190,7 @@ def _figure_eight() -> Scenario:
         mass_unit="m",
         speed_unit="u/t",
         speed_scale=1.0,
+        c=100.0,
     )
 
 
@@ -227,6 +232,7 @@ def _binary() -> Scenario:
         mass_unit="Msun",
         speed_unit="km/s",
         speed_scale=AU_PER_DAY_TO_KM_PER_S,
+        c=173.1446,
     )
 
 
@@ -278,6 +284,7 @@ def _trojans() -> Scenario:
         mass_unit="Msun",
         speed_unit="km/s",
         speed_scale=AU_PER_DAY_TO_KM_PER_S,
+        c=173.1446,
     )
 
 
@@ -311,6 +318,7 @@ def _pythagorean() -> Scenario:
         mass_unit="m",
         speed_unit="u/t",
         speed_scale=1.0,
+        c=100.0,
     )
 
 
@@ -345,6 +353,7 @@ def _lagrange() -> Scenario:
         mass_unit="m",
         speed_unit="u/t",
         speed_scale=1.0,
+        c=100.0,
     )
 
 

@@ -89,6 +89,46 @@ class WorldTests(unittest.TestCase):
         self.assertLess(orbit.eccentricity, 1e-6)
         self.assertAlmostEqual(orbit.period, YEAR_DAYS / math.sqrt(1.0 + mass), places=6)
 
+    def test_relativity_post_newtonian_precession(self):
+        # Primary of mass 1.0, test body with e = 0.5
+        sun = Body("Sun", 1.0, Vec2(), Vec2())
+        # Perihelion at r = 0.5, v = sqrt(G*M*(1+e)/r) = sqrt(1.5 / 0.5) = sqrt(3)
+        v0 = math.sqrt(3.0)
+        planet_newt = Body("P", 1e-6, Vec2(0.5, 0.0), Vec2(0.0, v0))
+        planet_rel = Body("P", 1e-6, Vec2(0.5, 0.0), Vec2(0.0, v0))
+        world_newt = World((sun, planet_newt), 1.0)
+        # Moderate c to produce noticeable 1PN precession without instability
+        world_rel = World((sun, planet_rel), 1.0, c=20.0)
+        dt = 0.001
+        # Advance 1 orbit (period ~ 2*pi * a^(3/2) = 2*pi ~ 6.28)
+        period = 2.0 * math.pi
+        world_newt.advance_to(period, dt)
+        world_rel.advance_to(period, dt)
+        # 1PN precession should cause relativistic orbit to have slight forward phase advance
+        self.assertNotEqual(world_newt.bodies[1].pos.x, world_rel.bodies[1].pos.x)
+        self.assertLess(abs(world_rel.energy_drift(world_rel.total_energy())), 1e-5)
+
+    def test_resolve_collisions_inelastic_merger(self):
+        b1 = Body("Heavy", 10.0, Vec2(0.0, 0.0), Vec2(0.0, 1.0), "H", "yellow")
+        b2 = Body("Light", 2.0, Vec2(0.005, 0.0), Vec2(0.0, -5.0), "L", "cyan")
+        b3 = Body("Distant", 1.0, Vec2(5.0, 0.0), Vec2(0.0, 0.0), "D", "white")
+        world = World((b1, b2, b3), 1.0)
+        p0 = world.momentum()
+        cm0 = world.center_of_mass()
+        events = world.resolve_collisions(merge_radius=0.01)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0], ("Heavy", "Light", "Heavy"))
+        self.assertEqual(len(world.bodies), 2)
+        merged = world.bodies[0]
+        self.assertEqual(merged.name, "Heavy")
+        self.assertEqual(merged.symbol, "H")
+        self.assertEqual(merged.mass, 12.0)
+        # Exact linear momentum and CM conservation
+        p1 = world.momentum()
+        cm1 = world.center_of_mass()
+        self.assertAlmostEqual(p0.distance_to(p1), 0.0, places=9)
+        self.assertAlmostEqual(cm0.distance_to(cm1), 0.0, places=9)
+
     def test_invalid_inputs_are_rejected(self):
         body = Body("A", 1.0, Vec2(), Vec2(), "a")
         world = World((body,), 1.0)
@@ -103,6 +143,10 @@ class WorldTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             World((Body("A", 1.0, Vec2(), Vec2()),
                    Body("A", 1.0, Vec2(1.0, 0.0), Vec2())), 1.0)
+        with self.assertRaises(ValueError):
+            World((body,), 1.0, c=0.0)
+        with self.assertRaises(ValueError):
+            World((body,), 1.0, c=-5.0)
 
 
 if __name__ == "__main__":

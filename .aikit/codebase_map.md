@@ -8,9 +8,9 @@
 ## 📊 Codebase Metrics
 - **Total Python Modules**: `18`
 - **Total Classes**: `26`
-- **Total Top-Level Functions**: `61`
-- **Total Class Methods**: `132`
-- **Total Source Lines**: `3004`
+- **Total Top-Level Functions**: `62`
+- **Total Class Methods**: `139`
+- **Total Source Lines**: `3289`
 
 ---
 
@@ -33,7 +33,7 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `911` lines (`36631` bytes)
+**Size**: `1028` lines (`42988` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
@@ -54,7 +54,7 @@
 - `def _scene_size(args)`
 - `def _trail_limit(args, scenario)`
 - `def _fit_span(scenario, width, height, aspect, margin)` - *Pick a vertical span large enough for the scenario's horizontal extent.*
-- `def _viewport(scenario, width, height, aspect)`
+- `def _viewport(scenario, width, height, aspect, center, span_factor)`
 - `def _aspect(args)`
 - `def _truncate(text, width)`
 - `def _pack_tokens(tokens, width, separator)`
@@ -68,13 +68,14 @@
 - `def _cmd_list(args)`
 - `def _cmd_info(args)`
 - `def _sparkline(values, width, *, ascii_only)` - *Render a compact sparkline trend string for a series of numeric samples.*
-- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused)`
-- `def _simulate(scenario, target, trail_limit)`
+- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused, camera_label)`
+- `def _simulate(scenario, target, trail_limit, *, relativity, c_override, merge_radius)`
 - `def _cmd_snapshot(args)`
 - `def _enable_windows_ansi()` - *Enable VT processing when possible; return whether ANSI control is safe.*
 - `def _cmd_run(args)`
 - `def _cmd_export(args)`
 - `def _add_view_options(parser, *, trails)`
+- `def _add_physics_options(parser)`
 - `def build_parser()`
 - `def main(argv)`
 
@@ -83,7 +84,7 @@
 ### [`orrery/custom.py`](orrery/custom.py)
 > *Load user-authored scenarios from JSON files.*
 
-**Size**: `224` lines (`9300` bytes)
+**Size**: `226` lines (`9415` bytes)
 
 **Classes:**
 - `class ScenarioFileError` - *A custom scenario could not be loaded; the CLI turns this into Error/Why/Fix.*
@@ -129,7 +130,7 @@
 ### [`orrery/scenarios.py`](orrery/scenarios.py)
 > *The built-in worlds.*
 
-**Size**: `394` lines (`13931` bytes)
+**Size**: `403` lines (`14243` bytes)
 
 **Classes:**
 - `class Scenario` - *A named initial state plus the knobs the player needs to present it.*
@@ -153,7 +154,7 @@
 ### [`orrery/sim.py`](orrery/sim.py)
 > *Gravity, bodies and a symplectic leapfrog integrator.*
 
-**Size**: `234` lines (`8347` bytes)
+**Size**: `295` lines (`11176` bytes)
 
 **Classes:**
 - `class Vec2` - *A point or vector in the plane.*
@@ -173,6 +174,7 @@
   - Method `.__post_init__()`
   - Method `.accelerations()`
   - Method `.step(dt)` - *Advance one kick-drift-kick leapfrog step of length ``dt``.*
+  - Method `.resolve_collisions(merge_radius)` - *Inelastically merge bodies closer than merge_radius, conserving momentum.*
   - Method `.advance(dt, steps)`
   - Method `.advance_to(target, dt)` - *Integrate to ``target``, ending with a shorter step when needed.*
   - Property `.total_mass`
@@ -185,7 +187,7 @@
   - Method `.energy_drift(initial_energy)`
 
 **Functions:**
-- `def _accelerations(bodies, g)` - *Pairwise Newtonian acceleration on every body.*
+- `def _accelerations(bodies, g, c)` - *Pairwise Newtonian acceleration on every body, with optional 1PN general relativity.*
 - `def orbital_elements(primary, body, g)` - *Osculating semi-major axis, eccentricity and period of ``body`` around ``primary``.*
 
 ---
@@ -193,15 +195,16 @@
 ### [`orrery/trails.py`](orrery/trails.py)
 > *Bounded, sampled position history for drawing orbit trails.*
 
-**Size**: `63` lines (`2387` bytes)
+**Size**: `80` lines (`3143` bytes)
 
 **Classes:**
 - `class TrailRecorder` - *Keep one bounded deque of past positions per body, sampled every N steps.*
   - Method `.__init__(world, limit)`
   - Property `.trails`
+  - Method `.sync(world)` - *Synchronize trail history buffers when the world body count changes.*
   - Method `.record(world)`
   - Method `.clear(world)` - *Clear historical trail samples, seeding with current positions if world is given.*
-  - Method `.advance(world, dt, steps, every)`
+  - Method `.advance(world, dt, steps, every, merge_radius)`
   - Method `.advance_to(world, target, dt, every)`
 
 ---
@@ -212,7 +215,7 @@
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `289` lines (`13262` bytes)
+**Size**: `324` lines (`14895` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -249,6 +252,9 @@
   - Method `.test_snapshot_telemetry_output()`
   - Method `.test_run_telemetry_and_no_controls()`
   - Method `.test_run_interactive_keyboard_events()`
+  - Method `.test_camera_pan_zoom_and_tracking()`
+  - Method `.test_scenario_switching_keys()`
+  - Method `.test_cli_relativity_and_merge_flags()`
 
 **Functions:**
 - `def run_cli(*argv)`
@@ -355,7 +361,7 @@
 ---
 
 ### [`tests/test_sim.py`](tests/test_sim.py)
-**Size**: `109` lines (`5034` bytes)
+**Size**: `153` lines (`7298` bytes)
 
 **Classes:**
 - `class Vec2Tests`
@@ -368,6 +374,8 @@
   - Method `.test_figure_eight_returns_after_one_period()`
   - Method `.test_parabolic_orbit_has_no_finite_elements()`
   - Method `.test_orbital_elements_describe_a_unit_circle()`
+  - Method `.test_relativity_post_newtonian_precession()`
+  - Method `.test_resolve_collisions_inelastic_merger()`
   - Method `.test_invalid_inputs_are_rejected()`
 
 ---

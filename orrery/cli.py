@@ -19,7 +19,7 @@ from . import __version__
 from .custom import ScenarioFileError, load_scenario_file
 from .render import ANSI, CELL_ASPECT, RESET, Viewport, render_scene, strip_ansi
 from .scenarios import Scenario, get_scenario, scenario_keys
-from .sim import Body, Orbit, World, orbital_elements
+from .sim import Body, Orbit, Vec2, World, orbital_elements
 from .trails import TrailRecorder
 
 SNAPSHOT_STEP_LIMIT = 2_000_000
@@ -143,9 +143,13 @@ def _fit_span(scenario: Scenario, width: int, height: int,
 
 
 def _viewport(scenario: Scenario, width: int, height: int,
-              aspect: float = CELL_ASPECT) -> Viewport:
-    return Viewport(width, height, _fit_span(scenario, width, height, aspect),
-                    aspect=aspect)
+              aspect: float = CELL_ASPECT,
+              center: Vec2 | None = None,
+              span_factor: float = 1.0) -> Viewport:
+    base_span = _fit_span(scenario, width, height, aspect)
+    effective_span = base_span * span_factor
+    eff_center = center if center is not None else Vec2()
+    return Viewport(width, height, effective_span, center=eff_center, aspect=aspect)
 
 
 def _aspect(args: argparse.Namespace) -> float:
@@ -448,7 +452,8 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
                    energy_history: Sequence[float] | None = None,
                    initial_momentum: float | None = None,
                    controls_hint: bool = False,
-                   paused: bool = False) -> str:
+                   paused: bool = False,
+                   camera_label: str | None = None) -> str:
     bar = "-" * viewport.width if ascii_only else "─" * viewport.width
     separator = " | " if ascii_only else " · "
     drift_label = "dE/E" if ascii_only else "ΔE/E"
@@ -464,6 +469,8 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
         f"bodies = {len(world.bodies)}",
         f"{drift_label} = {current_drift:+.2e}",
     ]
+    if camera_label:
+        stats.append(f"cam: {camera_label}")
     lines.extend(_pack_tokens(stats, viewport.width, separator="    "))
     if telemetry:
         history = list(energy_history) if energy_history else [current_drift]
@@ -487,23 +494,28 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
             legend.append(f"{body.symbol} {body.name}")
     lines.extend(_pack_tokens(legend, viewport.width))
     if controls_hint:
-        hint_text = "[Space] Pause  [+/-] Speed  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
+        hint_text = "[Space] Pause  [f] Track  [WASD] Pan  [[]] Zoom  [n/p] World  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
         if len(hint_text) <= viewport.width:
             lines.append(hint_text)
         else:
             lines.extend(_pack_tokens([
-                "[Space] Pause", "[+/-] Speed", "[C] Clear",
-                "[R] Reset", "[T] Telemetry", "[Q] Quit",
+                "[Space] Pause", "[f] Track", "[WASD] Pan", "[[]] Zoom",
+                "[n/p] World", "[C] Clear", "[R] Reset", "[T] Telemetry", "[Q] Quit",
             ], viewport.width, separator="  "))
     return "\n".join(lines)
 
 
-def _simulate(scenario: Scenario, target: float, trail_limit: int
-              ) -> tuple[World, TrailRecorder, float]:
-    world = World(scenario.bodies, scenario.g)
+def _simulate(scenario: Scenario, target: float, trail_limit: int,
+              *, relativity: bool = False, c_override: float | None = None,
+              merge_radius: float = 0.0) -> tuple[World, TrailRecorder, float]:
+    c_val = c_override if c_override is not None else (scenario.c if relativity else None)
+    world = World(scenario.bodies, scenario.g, c=c_val)
     initial_energy = world.total_energy()
     recorder = TrailRecorder(world, trail_limit)
     recorder.advance_to(world, target, scenario.dt, scenario.record_every)
+    if merge_radius > 0.0:
+        world.resolve_collisions(merge_radius)
+        recorder.sync(world)
     return world, recorder, initial_energy
 
 
@@ -526,8 +538,13 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
             code=2,
         )
     width, height = _scene_size(args)
+    relativity = getattr(args, "relativity", False)
+    c_override = getattr(args, "c_light", None)
+    merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
+
     world, recorder, initial_energy = _simulate(
-        scenario, args.at, _trail_limit(args, scenario)
+        scenario, args.at, _trail_limit(args, scenario),
+        relativity=relativity, c_override=c_override, merge_radius=merge_radius,
     )
     viewport = _viewport(scenario, width, height, _aspect(args))
     color = _color_enabled(args)
@@ -591,10 +608,17 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if not vt_ready:
         color = False
     screen_control = interactive and vt_ready
-    world, recorder, initial_energy = _simulate(scenario, 0.0, _trail_limit(args, scenario))
+    aspect = _aspect(args)
+    relativity = getattr(args, "relativity", False)
+    c_override = getattr(args, "c_light", None)
+    merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
+
+    world, recorder, initial_energy = _simulate(
+        scenario, 0.0, _trail_limit(args, scenario),
+        relativity=relativity, c_override=c_override, merge_radius=merge_radius,
+    )
     initial_momentum = world.angular_momentum()
     energy_history: list[float] = [world.energy_drift(initial_energy)]
-    viewport = _viewport(scenario, width, height, _aspect(args))
     frame_index = 0
     stopped = False
     paused = False
@@ -602,6 +626,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
     telemetry_enabled = getattr(args, "telemetry", False)
     controls_enabled = interactive and not getattr(args, "no_controls", False)
     show_hints = controls_enabled
+
+    zoom_factor = 1.0
+    pan_offset = Vec2()
+    tracking_index: int | None = None
+
+    catalog = scenario_keys()
+    scenario_idx = catalog.index(scenario.key) if scenario.key in catalog else None
 
     if screen_control:
         sys.stdout.write("\x1b[?25l")
@@ -624,14 +655,67 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         recorder.clear(world)
                     elif key in ("r", "R"):
                         world, recorder, initial_energy = _simulate(
-                            scenario, 0.0, _trail_limit(args, scenario)
+                            scenario, 0.0, _trail_limit(args, scenario),
+                            relativity=relativity, c_override=c_override, merge_radius=merge_radius,
                         )
                         initial_momentum = world.angular_momentum()
                         energy_history = [world.energy_drift(initial_energy)]
+                        zoom_factor = 1.0
+                        pan_offset = Vec2()
+                        tracking_index = None
                     elif key in ("t", "T"):
                         telemetry_enabled = not telemetry_enabled
                     elif key in ("h", "?"):
                         show_hints = not show_hints
+                    elif key in ("f", "F"):
+                        if not world.bodies:
+                            tracking_index = None
+                        elif tracking_index is None:
+                            tracking_index = 0
+                        elif tracking_index + 1 < len(world.bodies):
+                            tracking_index += 1
+                        else:
+                            tracking_index = None
+                    elif key == "0":
+                        tracking_index = None
+                        pan_offset = Vec2()
+                        zoom_factor = 1.0
+                    elif key in "123456789":
+                        digit = int(key) - 1
+                        if digit < len(world.bodies):
+                            tracking_index = digit
+                    elif key in ("[", "i", "I"):
+                        zoom_factor = max(0.02, zoom_factor / 1.25)
+                    elif key in ("]", "o", "O"):
+                        zoom_factor = min(50.0, zoom_factor * 1.25)
+                    elif key in ("w", "W"):
+                        span_now = _fit_span(scenario, width, height, aspect) * zoom_factor
+                        pan_offset = Vec2(pan_offset.x, pan_offset.y + 0.1 * span_now)
+                    elif key in ("s", "S"):
+                        span_now = _fit_span(scenario, width, height, aspect) * zoom_factor
+                        pan_offset = Vec2(pan_offset.x, pan_offset.y - 0.1 * span_now)
+                    elif key in ("a", "A"):
+                        span_now = _fit_span(scenario, width, height, aspect) * zoom_factor
+                        pan_offset = Vec2(pan_offset.x - 0.1 * span_now, pan_offset.y)
+                    elif key in ("d", "D"):
+                        span_now = _fit_span(scenario, width, height, aspect) * zoom_factor
+                        pan_offset = Vec2(pan_offset.x + 0.1 * span_now, pan_offset.y)
+                    elif key in ("n", "N", "p", "P") and catalog:
+                        if scenario_idx is None:
+                            scenario_idx = 0
+                        else:
+                            step = 1 if key in ("n", "N") else -1
+                            scenario_idx = (scenario_idx + step) % len(catalog)
+                        scenario = get_scenario(catalog[scenario_idx])
+                        world, recorder, initial_energy = _simulate(
+                            scenario, 0.0, _trail_limit(args, scenario),
+                            relativity=relativity, c_override=c_override, merge_radius=merge_radius,
+                        )
+                        initial_momentum = world.angular_momentum()
+                        energy_history = [world.energy_drift(initial_energy)]
+                        zoom_factor = 1.0
+                        pan_offset = Vec2()
+                        tracking_index = None
                     key = keyboard.poll()
 
                 if stopped:
@@ -639,11 +723,30 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
                 if not paused:
                     recorder.advance(world, scenario.dt, scenario.steps_per_frame,
-                                     scenario.record_every)
+                                     scenario.record_every, merge_radius=merge_radius)
                     frame_index += 1
                     energy_history.append(world.energy_drift(initial_energy))
                     if len(energy_history) > 60:
                         energy_history.pop(0)
+
+                if tracking_index is not None and tracking_index < len(world.bodies):
+                    center_pos = world.bodies[tracking_index].pos + pan_offset
+                else:
+                    center_pos = pan_offset
+                    if tracking_index is not None and tracking_index >= len(world.bodies):
+                        tracking_index = None
+
+                viewport = _viewport(scenario, width, height, aspect, center=center_pos,
+                                     span_factor=zoom_factor)
+
+                cam_tokens = []
+                if tracking_index is not None and tracking_index < len(world.bodies):
+                    cam_tokens.append(f"[{world.bodies[tracking_index].name}]")
+                if abs(zoom_factor - 1.0) > 0.05:
+                    cam_tokens.append(f"{1.0 / zoom_factor:.1f}x")
+                if pan_offset.norm() > 1e-4:
+                    cam_tokens.append("panned")
+                camera_label = " ".join(cam_tokens) if cam_tokens else None
 
                 if screen_control:
                     sys.stdout.write("\x1b[H\x1b[2J")
@@ -655,6 +758,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     initial_momentum=initial_momentum,
                     controls_hint=show_hints,
                     paused=paused,
+                    camera_label=camera_label,
                 ) + "\n")
                 sys.stdout.flush()
                 if frames == 0 or frame_index < frames:
@@ -829,6 +933,17 @@ def _add_view_options(parser: argparse.ArgumentParser, *, trails: bool = False) 
                             help="hide orbit trails")
 
 
+def _add_physics_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--relativity", action="store_true",
+                        help="enable post-Newtonian 1PN general relativistic precession")
+    parser.add_argument("--c-light", type=float, default=None,
+                        help="speed of light override for 1PN relativity")
+    parser.add_argument("--merge", action="store_true",
+                        help="enable inelastic collision coalescence")
+    parser.add_argument("--merge-radius", type=float, default=0.02,
+                        help="collision distance threshold for coalescence (default: 0.02)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = TriadParser(
         prog="orrery",
@@ -861,6 +976,7 @@ def build_parser() -> argparse.ArgumentParser:
     snapshot.add_argument("--telemetry", action="store_true",
                           help="display live energy drift trend in footer")
     _add_view_options(snapshot, trails=True)
+    _add_physics_options(snapshot)
     snapshot.set_defaults(handler=_cmd_snapshot)
 
     run = commands.add_parser("run", help="animate a scenario in the terminal")
@@ -875,6 +991,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--no-controls", action="store_true",
                      help="disable interactive keyboard controls")
     _add_view_options(run, trails=True)
+    _add_physics_options(run)
     run.set_defaults(handler=_cmd_run)
 
     export = commands.add_parser("export", help="write sampled positions to CSV")

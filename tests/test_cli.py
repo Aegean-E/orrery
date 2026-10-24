@@ -284,6 +284,41 @@ class InteractiveAndTelemetryTests(unittest.TestCase):
                     self.assertEqual(code, 0)
                     self.assertIn("Stopped at t =", output)
 
+    def test_camera_pan_zoom_and_tracking(self):
+        keys = iter(["f", "1", "w", "a", "s", "d", "[", "]", "0", "q"])
+
+        def fake_poll(self):
+            return next(keys, None)
+
+        with mock.patch.object(KeyboardReader, "poll", fake_poll):
+            with mock.patch("sys.stdout.isatty", return_value=True):
+                with mock.patch("sys.stdin.isatty", return_value=True):
+                    code, output = run_cli("run", "solar", "--frames", "0",
+                                           "--ascii", "--no-color")
+                    self.assertEqual(code, 0)
+                    self.assertIn("Stopped at t =", output)
+
+    def test_scenario_switching_keys(self):
+        keys = iter(["n", "p", "q"])
+
+        def fake_poll(self):
+            return next(keys, None)
+
+        with mock.patch.object(KeyboardReader, "poll", fake_poll):
+            with mock.patch("sys.stdout.isatty", return_value=True):
+                with mock.patch("sys.stdin.isatty", return_value=True):
+                    code, output = run_cli("run", "solar", "--frames", "0",
+                                           "--ascii", "--no-color")
+                    self.assertEqual(code, 0)
+
+    def test_cli_relativity_and_merge_flags(self):
+        code, output = run_cli("snapshot", "solar", "--relativity", "--c-light", "100.0",
+                               "--ascii", "--no-color", "--no-trail")
+        self.assertEqual(code, 0)
+        code, output = run_cli("snapshot", "solar", "--merge", "--merge-radius", "0.05",
+                               "--ascii", "--no-color", "--no-trail")
+        self.assertEqual(code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

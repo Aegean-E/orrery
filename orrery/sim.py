@@ -71,11 +71,13 @@ class Orbit:
     period: float | None
 
 
-def _accelerations(bodies: Sequence[Body], g: float) -> tuple[Vec2, ...]:
-    """Pairwise Newtonian acceleration on every body."""
+def _accelerations(bodies: Sequence[Body], g: float,
+                   c: float | None = None) -> tuple[Vec2, ...]:
+    """Pairwise Newtonian acceleration on every body, with optional 1PN general relativity."""
     count = len(bodies)
     ax = [0.0] * count
     ay = [0.0] * count
+    c2 = c * c if (c is not None and c > 0.0) else None
     for i in range(count - 1):
         first = bodies[i]
         for j in range(i + 1, count):
@@ -85,12 +87,30 @@ def _accelerations(bodies: Sequence[Body], g: float) -> tuple[Vec2, ...]:
             r2 = dx * dx + dy * dy
             if r2 <= 0.0:
                 continue
-            inverse_r3 = 1.0 / (r2 * math.sqrt(r2))
+            r = math.sqrt(r2)
+            inverse_r3 = 1.0 / (r2 * r)
             pull = g * inverse_r3
-            ax[i] += pull * second.mass * dx
-            ay[i] += pull * second.mass * dy
-            ax[j] -= pull * first.mass * dx
-            ay[j] -= pull * first.mass * dy
+            if c2 is not None:
+                dvx = first.vel.x - second.vel.x
+                dvy = first.vel.y - second.vel.y
+                v2 = dvx * dvx + dvy * dvy
+                rv_dot = dx * dvx + dy * dvy
+                phi = g * (first.mass + second.mass) / r
+                factor_r = (4.0 * phi - v2) / c2
+                factor_v = 4.0 * rv_dot / c2
+                a_ix = pull * second.mass * (dx * (1.0 + factor_r) - dvx * factor_v)
+                a_iy = pull * second.mass * (dy * (1.0 + factor_r) - dvy * factor_v)
+                a_jx = pull * first.mass * (dx * (1.0 + factor_r) - dvx * factor_v)
+                a_jy = pull * first.mass * (dy * (1.0 + factor_r) - dvy * factor_v)
+                ax[i] += a_ix
+                ay[i] += a_iy
+                ax[j] -= a_jx
+                ay[j] -= a_jy
+            else:
+                ax[i] += pull * second.mass * dx
+                ay[i] += pull * second.mass * dy
+                ax[j] -= pull * first.mass * dx
+                ay[j] -= pull * first.mass * dy
     return tuple(Vec2(ax[i], ay[i]) for i in range(count))
 
 
@@ -101,10 +121,13 @@ class World:
     bodies: tuple[Body, ...]
     g: float
     time: float = 0.0
+    c: float | None = None
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.g) or self.g <= 0.0:
             raise ValueError("the gravitational constant must be a positive finite number")
+        if self.c is not None and (not math.isfinite(self.c) or self.c <= 0.0):
+            raise ValueError("the speed of light must be a positive finite number")
         if not self.bodies:
             raise ValueError("a world needs at least one body")
         names = set()
@@ -121,14 +144,14 @@ class World:
             raise ValueError("time must be finite")
 
     def accelerations(self) -> tuple[Vec2, ...]:
-        return _accelerations(self.bodies, self.g)
+        return _accelerations(self.bodies, self.g, self.c)
 
     def step(self, dt: float) -> None:
         """Advance one kick-drift-kick leapfrog step of length ``dt``."""
         if not math.isfinite(dt) or dt <= 0.0:
             raise ValueError("the time step must be a positive finite number")
         half = dt * 0.5
-        start = _accelerations(self.bodies, self.g)
+        start = _accelerations(self.bodies, self.g, self.c)
         drifted = tuple(
             replace(
                 body,
@@ -140,12 +163,50 @@ class World:
             )
             for body, acc in zip(self.bodies, start)
         )
-        end = _accelerations(drifted, self.g)
+        end = _accelerations(drifted, self.g, self.c)
         self.bodies = tuple(
             replace(body, vel=Vec2(body.vel.x + acc.x * half, body.vel.y + acc.y * half))
             for body, acc in zip(drifted, end)
         )
         self.time += dt
+
+    def resolve_collisions(self, merge_radius: float = 0.01) -> list[tuple[str, str, str]]:
+        """Inelastically merge bodies closer than merge_radius, conserving momentum."""
+        if merge_radius <= 0.0 or len(self.bodies) <= 1:
+            return []
+        bodies_list = list(self.bodies)
+        events: list[tuple[str, str, str]] = []
+        i = 0
+        while i < len(bodies_list):
+            j = i + 1
+            merged_any = False
+            while j < len(bodies_list):
+                b1 = bodies_list[i]
+                b2 = bodies_list[j]
+                if b1.pos.distance_to(b2.pos) <= merge_radius:
+                    total_m = b1.mass + b2.mass
+                    pos = (b1.pos * b1.mass + b2.pos * b2.mass) / total_m
+                    vel = (b1.vel * b1.mass + b2.vel * b2.mass) / total_m
+                    primary, secondary = (b1, b2) if b1.mass >= b2.mass else (b2, b1)
+                    new_body = Body(
+                        name=primary.name,
+                        mass=total_m,
+                        pos=pos,
+                        vel=vel,
+                        symbol=primary.symbol,
+                        color=primary.color,
+                    )
+                    events.append((primary.name, secondary.name, new_body.name))
+                    bodies_list[i] = new_body
+                    bodies_list.pop(j)
+                    merged_any = True
+                else:
+                    j += 1
+            if not merged_any:
+                i += 1
+        if events:
+            self.bodies = tuple(bodies_list)
+        return events
 
     def advance(self, dt: float, steps: int) -> None:
         if steps < 0:

@@ -78,3 +78,18 @@ contract, a dependency, a data format or the architecture; IDs are consecutive a
   Unicode blocks.
 - **Consequences**: Orrery becomes an interactive, responsive terminal toy while preserving pure
   scripted and piped automation parity.
+
+### ADR-006: Body tracking camera, 1PN relativistic precession, coalescence, and scenario switching
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**: Studying orbits from rotating non-inertial frames (e.g. geocentric epicycles) required
+  centering the camera on moving bodies. Accretion physics required inelastic mergers, and Mercury's
+  perihelion shift required general relativistic post-Newtonian corrections.
+- **Decision**: Extend `Viewport` with dynamic center offset and span factor. In `_cmd_run`, add body
+  tracking (`f`, digits `1-9`), WASD/arrow panning, zoom (`[`/`]`), reset (`0`), and scenario switching
+  (`n`/`p`). Add pairwise 1PN post-Newtonian acceleration when `c` is specified (`--relativity`, `--c-light`),
+  producing Einstein's 43 arcseconds/century perihelion shift. Implement inelastic coalescence
+  (`--merge`, `--merge-radius`) strictly conserving linear momentum, mass, and center of mass,
+  with automatic trail recorder buffer synchronization.
+- **Consequences**: Orrery functions as a multi-reference-frame observatory with relativistic and accretion
+  capabilities while remaining completely zero-dependency and backward-compatible.

@@ -195,6 +195,7 @@ def load_scenario_file(path_like: str | Path) -> Scenario:
         "export_until",
         positive=True,
     )
+    c = _number(data["c"], "c", positive=True) if "c" in data and data["c"] is not None else None
 
     try:
         return Scenario(
@@ -216,6 +217,7 @@ def load_scenario_file(path_like: str | Path) -> Scenario:
             mass_unit=mass_unit,
             speed_unit=speed_unit,
             speed_scale=speed_scale,
+            c=c,
         )
     except ValueError as error:
         _fail(

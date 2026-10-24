@@ -101,8 +101,8 @@ more resolve to the right scenario.
 python -m orrery list [--json]
 python -m orrery info KEY|FILE [--json]
 python -m orrery validate FILE
-python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
-python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
 python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME]
 ```
 
@@ -226,7 +226,7 @@ orrery/
 
 ## 🧪 Verification
 
-The suite is 85 tests and completes in about 1.4 seconds:
+The suite is 90 tests and completes in about 1.3 seconds:
 
 ```bash
 python -m unittest discover -s tests -t .
@@ -274,7 +274,7 @@ types ship with the package (`py.typed`).
 ## 📚 Design Notes
 
 The integrator, unit policy, rendering boundary, viewport fitting and work caps are recorded in
-`.aikit/decisions.md` (ADR-001 through ADR-005).
+`.aikit/decisions.md` (ADR-001 through ADR-006).
 
 ## 📄 License
 

@@ -1,12 +1,11 @@
 {
   "version": 1,
   "active_task": {
-    "task_id": "orrery-v3",
-    "last_phase": "phase 5",
-    "active_phase": 5,
-    "status": "completed",
-    "updated_at": 1792831536.6792018,
-    "completed_at": 1792831540.1091328
+    "task_id": "orrery-v4",
+    "last_phase": "phase 4",
+    "active_phase": 4,
+    "status": "in_progress",
+    "updated_at": 1792832177.3680525
   },
   "checkpoints": [
     {
@@ -188,6 +187,37 @@
       "status": "completed",
       "timestamp": 1792831540.1091347,
       "timestamp_str": "2026-10-24 11:45:40"
+    },
+    {
+      "task_id": "orrery-v4",
+      "phase": "phase 2",
+      "phase_num": 2,
+      "description": "[1/5] Plan: camera pan/zoom/body tracking, relativistic 1PN precession, collision coalescence mode, interactive scenario switching, and remote push",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792831687.5269089,
+      "timestamp_str": "2026-10-24 11:48:07",
+      "impact_assessment": {
+        "why": "User requested all proposed advanced capabilities: camera control and body tracking, 1PN general relativistic precession, inelastic merger collisions, and live scenario switching.",
+        "benefits": "Elevates Orrery into a full astronomical observatory: study orbits from rotating reference frames (e.g. geocentric epicycles), observe Mercury's precession, simulate planetary accretion, and switch worlds dynamically.",
+        "risks": "contract: default behaviour must remain unchanged; dependency: strictly standard library; concurrency: single-threaded event loop; state: merging modifies body array cleanly.",
+        "mitigation": "Opt-in flags (--relativity, --merge) preserve existing defaults; trail recorder handles dynamic body counts on merger; tests cover all new modes."
+      }
+    },
+    {
+      "task_id": "orrery-v4",
+      "phase": "phase 4",
+      "phase_num": 4,
+      "description": "[4/5] Implemented body tracking camera, WASD pan, zoom, scenario switching (n/p), 1PN relativity, collision merging (ADR-006); 90 tests pass; 5/5 gates pass; checklists: passed",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792832177.3680525,
+      "timestamp_str": "2026-10-24 11:56:17",
+      "handoff": {
+        "state": "all implementation complete",
+        "next": "stage explicitly, commit, verify strict, and push to origin master",
+        "evidence": "90 tests pass, 5/5 gates pass"
+      }
     }
   ]
 }
