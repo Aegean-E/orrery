@@ -3,21 +3,13 @@
   "active_task": {
     "task_id": "orrery-v8-polish",
     "last_phase": "phase 4",
-    "active_phase": 4,
-    "status": "in_progress",
+    "active_phase": 5,
+    "status": "completed",
     "updated_at": 1792861573.2090688,
-    "owner": "unidentified"
+    "owner": "unidentified",
+    "completed_at": 1792861607.4718447
   },
   "checkpoints": [
-    {
-      "task_id": "orrery-v3",
-      "phase": "completed",
-      "phase_num": 5,
-      "description": "Task 'orrery-v3' completed successfully.",
-      "status": "completed",
-      "timestamp": 1792831540.1091347,
-      "timestamp_str": "2026-10-24 11:45:40"
-    },
     {
       "task_id": "orrery-v4",
       "phase": "phase 2",
@@ -260,6 +252,16 @@
       "status": "in_progress",
       "timestamp": 1792861573.2090688,
       "timestamp_str": "2026-10-24 20:06:13",
+      "agent": "unidentified"
+    },
+    {
+      "task_id": "orrery-v8-polish",
+      "phase": "completed",
+      "phase_num": 5,
+      "description": "Task 'orrery-v8-polish' completed successfully.",
+      "status": "completed",
+      "timestamp": 1792861607.4718459,
+      "timestamp_str": "2026-10-24 20:06:47",
       "agent": "unidentified"
     }
   ]
