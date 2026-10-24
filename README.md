@@ -45,6 +45,7 @@ A Alpha   B Beta   C Gamma
   python -m orrery list
   python -m orrery snapshot solar --at 120
   python -m orrery run figure-eight
+  python -m orrery web solar
   python -m orrery info binary
   python -m orrery export trojans --out trojans.csv --until 365
   ```
@@ -72,6 +73,17 @@ pass `--no-braille` for one-cell trail marks, or `--ascii` to force ASCII border
   ./run.command binary --frames 120
   ./run.sh binary --frames 120
   ```
+
+The browser studio has its own launchers. They start `python -m orrery web`, print the local URL,
+and open your default browser:
+
+- **Windows**: double-click `run-web.cmd`.
+- **macOS**: double-click `run-web.command`.
+- **Linux**: run `./run-web.sh` (or `sh run-web.sh`).
+
+They accept the same arguments as `web`, for example `run-web.cmd binary` or
+`run-web.cmd solar --merge --dt 0.05`. Close the launcher window or press `Ctrl-C` to stop the
+server.
 
 ### 🛠️ AIKit Commands (run from the AIKit folder)
 
@@ -207,6 +219,9 @@ orrery/
 ├── run.cmd                   <- one-click Windows launcher (solar by default)
 ├── run.command               <- one-click macOS launcher, delegates to run.sh
 ├── run.sh                    <- one-click Linux/POSIX launcher
+├── run-web.cmd               <- one-click Windows launcher for the browser studio
+├── run-web.command           <- one-click macOS launcher, delegates to run-web.sh
+├── run-web.sh                <- one-click Linux/POSIX launcher for the browser studio
 ├── orrery/
 │   ├── __init__.py
 │   ├── __main__.py           <- `python -m orrery`
@@ -235,7 +250,7 @@ orrery/
 
 ## 🧪 Verification
 
-The suite is 138 tests and completes in about 6 seconds:
+The suite is 141 tests and completes in about 6 seconds:
 
 ```bash
 python -m unittest discover -s tests -t .

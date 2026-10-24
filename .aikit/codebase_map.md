@@ -9,8 +9,8 @@
 - **Total Python Modules**: `20`
 - **Total Classes**: `31`
 - **Total Top-Level Functions**: `76`
-- **Total Class Methods**: `206`
-- **Total Source Lines**: `6043`
+- **Total Class Methods**: `209`
+- **Total Source Lines**: `6064`
 
 ---
 
@@ -368,7 +368,7 @@
 ### [`tests/test_launchers.py`](tests/test_launchers.py)
 > *One-click launch files: present, CRLF-safe on Windows and Python 3.10-aware.*
 
-**Size**: `45` lines (`1528` bytes)
+**Size**: `66` lines (`2457` bytes)
 
 **Classes:**
 - `class LauncherTest`
@@ -378,6 +378,9 @@
   - Method `.test_launchers_check_python_310_and_start_the_module()`
   - Method `.test_batch_checks_each_python_candidate()`
   - Method `.test_batch_failure_stays_visible()`
+  - Method `.test_web_launchers_exist_and_start_the_web_command()`
+  - Method `.test_web_command_launcher_delegates_to_the_shell_launcher()`
+  - Method `.test_web_batch_file_has_crlf_line_endings()`
 
 ---
 
