@@ -7,27 +7,94 @@ body tracking camera, scientific telemetry, and custom scenario support.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field, replace
 from http import HTTPStatus
 import http.server
 import json
+import math
 from pathlib import Path
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
 import webbrowser
 
-from .custom import load_scenario_file
-from .scenarios import get_scenario, scenario_keys
+from .custom import MAX_FILE_BYTES, load_scenario_file
+from .scenarios import Scenario, get_scenario, scenario_keys
 from .sim import World, orbital_elements
 
 DEFAULT_PORT = 8000
 DEFAULT_HOST = "127.0.0.1"
+MAX_REQUEST_BYTES = MAX_FILE_BYTES
 
 
-def _scenario_to_dict(scenario_key: str) -> dict[str, object]:
-    scenario = get_scenario(scenario_key)
-    world = World(scenario.bodies, scenario.g, c=scenario.c, k_e=scenario.k_e)
+@dataclass(frozen=True, slots=True)
+class WebOptions:
+    """Physics and time overrides shared by the browser and the terminal.
+
+    ``None`` means "keep the scenario's own value"; the browser then falls back
+    to its built-in control defaults, so callers that do not pass options see
+    exactly the previous behaviour.
+    """
+
+    dt: float | None = None
+    time_scale: float = 1.0
+    reverse: bool = False
+    relativity: bool | None = None
+    c_light: float | None = None
+    k_coulomb: float | None = None
+    collision_mode: str = "bounce"
+    bounce_radius: float | None = 0.06
+    restitution: float | None = 0.95
+    merge_radius: float | None = 0.04
+
+    def as_dict(self) -> dict[str, object]:
+        """Return the JSON-safe view the browser consumes at startup."""
+        return {
+            "dt": self.dt,
+            "time_scale": self.time_scale,
+            "reverse": self.reverse,
+            "relativity": self.relativity,
+            "c_light": self.c_light,
+            "k_coulomb": self.k_coulomb,
+            "collision_mode": self.collision_mode,
+            "bounce_radius": self.bounce_radius,
+            "restitution": self.restitution,
+            "merge_radius": self.merge_radius,
+        }
+
+
+@dataclass(slots=True)
+class _WebState:
+    """Per-server state: the chosen world, overrides and uploaded scenarios."""
+
+    initial_key: str
+    options: WebOptions
+    registry: dict[str, Scenario] = field(default_factory=dict)
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+_DEFAULT_STATE = _WebState(initial_key="solar", options=WebOptions())
+
+
+def _scenario_overrides(scenario: Scenario,
+                        options: WebOptions) -> tuple[float, float | None, float]:
+    """Resolve scenario defaults against CLI overrides exactly like the terminal."""
+    dt = options.dt if options.dt is not None else scenario.dt
+    if options.c_light is not None:
+        c = options.c_light
+    elif options.relativity is None:
+        c = scenario.c
+    else:
+        c = scenario.c if options.relativity else None
+    k_e = options.k_coulomb if options.k_coulomb is not None else scenario.k_e
+    return dt, c, k_e
+
+
+def _scenario_payload(scenario: Scenario, options: WebOptions) -> dict[str, object]:
+    dt, c, k_e = _scenario_overrides(scenario, options)
+    world = World(scenario.bodies, scenario.g, c=c, k_e=k_e)
     dominant_index = max(range(len(world.bodies)), key=lambda i: world.bodies[i].mass)
     primary = world.bodies[dominant_index]
     dominant = len(world.bodies) < 2 or (
@@ -57,7 +124,7 @@ def _scenario_to_dict(scenario_key: str) -> dict[str, object]:
         "title": scenario.title,
         "description": scenario.description,
         "g": scenario.g,
-        "dt": scenario.dt,
+        "dt": dt,
         "span": scenario.span,
         "extent": list(scenario.extent),
         "steps_per_frame": scenario.steps_per_frame,
@@ -67,8 +134,8 @@ def _scenario_to_dict(scenario_key: str) -> dict[str, object]:
         "mass_unit": scenario.mass_unit,
         "speed_unit": scenario.speed_unit,
         "speed_scale": scenario.speed_scale,
-        "c": scenario.c,
-        "k_e": scenario.k_e,
+        "c": c,
+        "k_e": k_e,
         "schwarzschild_radius": world.schwarzschild_radius(),
         "total_energy": world.total_energy(),
         "kinetic_energy": world.kinetic_energy(),
@@ -78,7 +145,29 @@ def _scenario_to_dict(scenario_key: str) -> dict[str, object]:
     }
 
 
-def _catalog_list() -> list[dict[str, object]]:
+def _scenario_to_dict(scenario_key: str, options: WebOptions | None = None) -> dict[str, object]:
+    """Describe one built-in scenario using the default web overrides."""
+    return _scenario_payload(get_scenario(scenario_key), options or WebOptions())
+
+
+def _json_safe(value: object) -> object:
+    """Replace non-finite floats so the response stays valid strict JSON."""
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+def _catalog_list(state: _WebState | None = None) -> list[dict[str, object]]:
+    scenarios: dict[str, Scenario] = {
+        key: get_scenario(key) for key in scenario_keys()
+    }
+    if state is not None:
+        with state.lock:
+            scenarios.update(state.registry)
     return [
         {
             "key": s.key,
@@ -89,8 +178,25 @@ def _catalog_list() -> list[dict[str, object]]:
             "c": s.c,
             "k_e": s.k_e,
         }
-        for s in (get_scenario(k) for k in scenario_keys())
+        for s in scenarios.values()
     ]
+
+
+def _register_scenario(state: _WebState, scenario: Scenario) -> Scenario:
+    """Store an uploaded scenario under a key that cannot shadow a built-in one."""
+    with state.lock:
+        if state.registry.get(scenario.key) == scenario:
+            return state.registry[scenario.key]
+        unique_key = scenario.key
+        if unique_key in scenario_keys() or unique_key in state.registry:
+            suffix = 2
+            while (f"{unique_key}-{suffix}" in scenario_keys()
+                   or f"{unique_key}-{suffix}" in state.registry):
+                suffix += 1
+            unique_key = f"{unique_key}-{suffix}"
+            scenario = replace(scenario, key=unique_key)
+        state.registry[unique_key] = scenario
+        return scenario
 
 
 class OrreryHandler(http.server.BaseHTTPRequestHandler):
@@ -103,8 +209,19 @@ class OrreryHandler(http.server.BaseHTTPRequestHandler):
         _ = (format, args)
         return
 
+    def _state(self) -> _WebState:
+        """Return the state attached by run_server, or safe defaults for bare handlers."""
+        state = getattr(self.server, "state", None)
+        return state if isinstance(state, _WebState) else _DEFAULT_STATE
+
+    def _resolve(self, key: str) -> Scenario:
+        state = self._state()
+        with state.lock:
+            scenario = state.registry.get(key)
+        return scenario if scenario is not None else get_scenario(key)
+
     def _send_json(self, status: int, data: object) -> None:
-        payload = json.dumps(data, allow_nan=False).encode("utf-8")
+        payload = json.dumps(_json_safe(data), allow_nan=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
@@ -132,15 +249,29 @@ class OrreryHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.OK, {"status": "ok", "app": "orrery"})
             return
         if path == "/api/scenarios":
-            self._send_json(HTTPStatus.OK, _catalog_list())
+            self._send_json(HTTPStatus.OK, _catalog_list(self._state()))
+            return
+        if path == "/api/config":
+            state = self._state()
+            self._send_json(HTTPStatus.OK, {
+                "initial": state.initial_key,
+                "options": state.options.as_dict(),
+            })
             return
         if path.startswith("/api/scenario/"):
-            key = path[len("/api/scenario/"):]
+            requested = urllib.parse.unquote(path[len("/api/scenario/"):])
             try:
-                data = _scenario_to_dict(key)
-                self._send_json(HTTPStatus.OK, data)
+                scenario = self._resolve(requested)
+                data = _scenario_payload(scenario, self._state().options)
             except KeyError:
-                self._send_json(HTTPStatus.NOT_FOUND, {"error": f"scenario '{key}' not found"})
+                self._send_json(HTTPStatus.NOT_FOUND,
+                                {"error": f"scenario '{requested}' not found"})
+                return
+            except (ValueError, OverflowError) as err:
+                self._send_json(HTTPStatus.BAD_REQUEST,
+                                {"error": f"scenario '{requested}' cannot be described: {err}"})
+                return
+            self._send_json(HTTPStatus.OK, data)
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -148,22 +279,42 @@ class OrreryHandler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/validate":
             try:
-                length = int(self.headers.get("Content-Length", "0"))
+                length = int(self.headers.get("Content-Length", ""))
+            except ValueError:
+                self._send_json(HTTPStatus.BAD_REQUEST,
+                                {"valid": False, "error": "Content-Length must be an integer"})
+                return
+            if length <= 0:
+                self._send_json(HTTPStatus.BAD_REQUEST,
+                                {"valid": False, "error": "the request body is empty"})
+                return
+            if length > MAX_REQUEST_BYTES:
+                self.close_connection = True
+                if length <= MAX_REQUEST_BYTES + 65_536:
+                    try:
+                        self.rfile.read(length)
+                    except OSError:
+                        return
+                self._send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {
+                    "valid": False,
+                    "error": f"scenario files are limited to {MAX_REQUEST_BYTES:,} bytes",
+                })
+                return
+            try:
                 body = self.rfile.read(length).decode("utf-8")
-                temp_file = Path(".tmp_web_scenario.json")
-                temp_file.write_text(body, encoding="utf-8")
-                try:
-                    sc = load_scenario_file(temp_file)
-                    self._send_json(HTTPStatus.OK, {
-                        "valid": True,
-                        "key": sc.key,
-                        "title": sc.title,
-                        "bodies": len(sc.bodies),
-                    })
-                finally:
-                    if temp_file.exists():
-                        temp_file.unlink(missing_ok=True)
-            except Exception as err:
+                if len(body.encode("utf-8")) > MAX_REQUEST_BYTES:
+                    raise ValueError(f"scenario files are limited to {MAX_REQUEST_BYTES:,} bytes")
+                with tempfile.TemporaryDirectory(prefix="orrery-web-") as folder:
+                    temp_file = Path(folder) / "scenario.json"
+                    temp_file.write_text(body, encoding="utf-8")
+                    scenario = _register_scenario(self._state(), load_scenario_file(temp_file))
+                self._send_json(HTTPStatus.OK, {
+                    "valid": True,
+                    "key": scenario.key,
+                    "title": scenario.title,
+                    "bodies": len(scenario.bodies),
+                })
+            except Exception as err:  # noqa: BLE001 - any loader failure is a client error
                 self._send_json(HTTPStatus.BAD_REQUEST, {"valid": False, "error": str(err)})
             return
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
@@ -171,8 +322,28 @@ class OrreryHandler(http.server.BaseHTTPRequestHandler):
 
 def run_server(port: int = DEFAULT_PORT, host: str = DEFAULT_HOST,
                initial_scenario: str = "solar", auto_open: bool = True,
-               once: bool = False) -> int:
-    """Run the zero-dependency Orrery Web HTTP server."""
+               once: bool = False, options: WebOptions | None = None,
+               scenario: Scenario | None = None) -> int:
+    """Run the zero-dependency Orrery Web HTTP server.
+
+    ``scenario`` carries an already-resolved world (built-in alias or custom
+    file) and takes precedence over ``initial_scenario``; ``options`` applies
+    the CLI physics/time overrides to both the initial world and every fetch.
+    """
+    if scenario is None:
+        try:
+            scenario = get_scenario(initial_scenario)
+        except KeyError:
+            sys.stderr.write(f"Error: unknown scenario '{initial_scenario}'.\n"
+                             "Why: the web UI needs a built-in key or a .json scenario file.\n"
+                             "Fix: run `python -m orrery list`, or pass a valid file path.\n")
+            return 2
+    state = _WebState(initial_key=scenario.key, options=options or WebOptions())
+    if scenario.key in scenario_keys():
+        state.initial_key = scenario.key
+    else:
+        state.initial_key = _register_scenario(state, scenario).key
+
     server_address = (host, port)
     server_cls = http.server.HTTPServer if once else http.server.ThreadingHTTPServer
     try:
@@ -180,11 +351,12 @@ def run_server(port: int = DEFAULT_PORT, host: str = DEFAULT_HOST,
     except OSError as error:
         sys.stderr.write(f"Error: could not bind to {host}:{port}: {error}\n")
         return 1
+    httpd.state = state  # type: ignore[attr-defined]
 
     actual_port = httpd.server_port
     url = f"http://{host}:{actual_port}/"
     sys.stdout.write(f"ORRERY Web UI active at {url}\n")
-    sys.stdout.write(f"Initial world: {initial_scenario}  |  Press Ctrl+C to terminate\n")
+    sys.stdout.write(f"Initial world: {state.initial_key}  |  Press Ctrl+C to terminate\n")
     sys.stdout.flush()
 
     if auto_open and not once:
@@ -618,30 +790,53 @@ table.bodies-table th:first-child, table.bodies-table td:first-child { text-alig
     energyCanvas.width = energyCanvas.clientWidth * window.devicePixelRatio;
     energyCanvas.height = energyCanvas.clientHeight * window.devicePixelRatio;
   }
+
+  // Clamp a slider by widening its range, so overrides outside the default
+  // bounds are shown and used instead of being silently snapped.
+  function setSliderValue(id, value) {
+    const slider = document.getElementById(id);
+    const number = Number(value);
+    if (!Number.isFinite(number)) return;
+    slider.min = Math.min(parseFloat(slider.min), number).toString();
+    slider.max = Math.max(parseFloat(slider.max), number).toString();
+    slider.value = number.toString();
+    return number;
+  }
   window.addEventListener('resize', resize);
   resize();
 
-  // Load scenarios catalogue
-  fetch('/api/scenarios')
-    .then(r => r.json())
-    .then(list => {
-      const select = document.getElementById('scenario-select');
-      select.innerHTML = '';
-      list.forEach(item => {
-        const opt = document.createElement('option');
-        opt.value = item.key;
-        opt.textContent = `${item.title} (${item.bodies} bodies)`;
-        select.appendChild(opt);
-      });
-      loadScenario(list[0].key);
+  // Load the server's initial world, option overrides and scenario catalogue
+  let webConfig = { initial: 'solar', options: {} };
+  Promise.all([
+    fetch('/api/config').then(r => r.json()),
+    fetch('/api/scenarios').then(r => r.json())
+  ]).then(([config, list]) => {
+    webConfig = config;
+    const select = document.getElementById('scenario-select');
+    select.innerHTML = '';
+    list.forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item.key;
+      opt.textContent = `${item.title} (${item.bodies} bodies)`;
+      select.appendChild(opt);
     });
+    const initial = config.initial || (list[0] && list[0].key) || 'solar';
+    if (!Array.from(select.options).some(opt => opt.value === initial)) {
+      const opt = document.createElement('option');
+      opt.value = initial;
+      opt.textContent = initial;
+      select.appendChild(opt);
+    }
+    select.value = initial;
+    loadScenario(initial);
+  });
 
   document.getElementById('scenario-select').addEventListener('change', e => {
     loadScenario(e.target.value);
   });
 
   function loadScenario(key) {
-    fetch(`/api/scenario/${key}`)
+    fetch(`/api/scenario/${encodeURIComponent(key)}`)
       .then(r => r.json())
       .then(data => {
         state.bodies = data.bodies.map(b => ({
@@ -671,15 +866,54 @@ table.bodies-table th:first-child, table.bodies-table td:first-child { text-alig
 
         document.getElementById('scenario-desc').textContent = data.description;
         document.getElementById('units-badge').textContent = `${data.distance_unit}, ${data.time_unit}`;
-        document.getElementById('slider-dt').value = data.dt;
+        setSliderValue('slider-dt', data.dt);
         document.getElementById('label-dt').textContent = data.dt.toString();
         document.getElementById('check-relativity').checked = data.c !== null;
-        if (data.c) document.getElementById('slider-c').value = data.c;
+        if (data.c !== null) setSliderValue('slider-c', data.c);
         document.getElementById('check-coulomb').checked = data.k_e > 0.0;
-        if (data.k_e) document.getElementById('slider-ke').value = data.k_e;
+        if (data.k_e) setSliderValue('slider-ke', data.k_e);
+        document.getElementById('label-ke').textContent = 'ke=' + data.k_e;
+        document.getElementById('label-c').textContent = 'c=' + (data.c !== null ? data.c : document.getElementById('slider-c').value);
 
         updateTrackingSelect();
+        applyWebOptions();
       });
+  }
+
+  function applyWebOptions() {
+    const op = webConfig.options || {};
+    if (op.dt !== null && op.dt !== undefined) {
+      state.dt = op.dt;
+      setSliderValue('slider-dt', op.dt);
+      document.getElementById('label-dt').textContent = op.dt.toString();
+    }
+    if (op.time_scale !== null && op.time_scale !== undefined) {
+      state.timeWarp = op.time_scale;
+      document.getElementById('warp-label').textContent = op.time_scale + 'x';
+    }
+    if (op.reverse) {
+      state.timeDirection = -1.0;
+      const btn = document.getElementById('btn-reverse');
+      btn.textContent = 'REVERSE';
+      btn.className = 'badge badge-reverse';
+    }
+    if (op.c_light !== null && op.c_light !== undefined) {
+      setSliderValue('slider-c', op.c_light);
+      document.getElementById('check-relativity').checked = true;
+      document.getElementById('label-c').textContent = 'c=' + op.c_light;
+    }
+    if (op.k_coulomb !== null && op.k_coulomb !== undefined) {
+      setSliderValue('slider-ke', op.k_coulomb);
+      document.getElementById('check-coulomb').checked = true;
+      document.getElementById('label-ke').textContent = 'ke=' + op.k_coulomb;
+    }
+    if (op.collision_mode) {
+      state.collisionMode = op.collision_mode;
+      document.getElementById('select-collision').value = op.collision_mode;
+    }
+    if (op.bounce_radius !== null && op.bounce_radius !== undefined) state.bounceRadius = op.bounce_radius;
+    if (op.restitution !== null && op.restitution !== undefined) state.restitution = op.restitution;
+    if (op.merge_radius !== null && op.merge_radius !== undefined) state.mergeRadius = op.merge_radius;
   }
 
   function updateTrackingSelect() {
@@ -905,6 +1139,12 @@ table.bodies-table th:first-child, table.bodies-table td:first-child { text-alig
     state.dt = parseFloat(e.target.value);
     document.getElementById('label-dt').textContent = state.dt.toString();
   });
+  document.getElementById('slider-c').addEventListener('input', e => {
+    document.getElementById('label-c').textContent = 'c=' + e.target.value;
+  });
+  document.getElementById('slider-ke').addEventListener('input', e => {
+    document.getElementById('label-ke').textContent = 'ke=' + e.target.value;
+  });
   document.getElementById('slider-trail').addEventListener('input', e => {
     state.maxTrails = parseInt(e.target.value);
     document.getElementById('label-trail').textContent = state.maxTrails.toString();
@@ -938,6 +1178,14 @@ table.bodies-table th:first-child, table.bodies-table td:first-child { text-alig
         .then(r => r.json())
         .then(res => {
           if (res.valid) {
+            const select = document.getElementById('scenario-select');
+            if (!Array.from(select.options).some(opt => opt.value === res.key)) {
+              const opt = document.createElement('option');
+              opt.value = res.key;
+              opt.textContent = `${res.title} (${res.bodies} bodies)`;
+              select.appendChild(opt);
+            }
+            select.value = res.key;
             alert(`Loaded custom scenario: ${res.title}`);
             loadScenario(res.key);
           } else {
@@ -1103,12 +1351,19 @@ table.bodies-table th:first-child, table.bodies-table td:first-child { text-alig
         const tr = document.createElement('tr');
         const spd = Math.hypot(b.vx, b.vy).toFixed(2);
         const dist = Math.hypot(b.x, b.y).toFixed(2);
-        tr.innerHTML = `
-          <td><span style="color:${b.color}">●</span> ${b.name}</td>
-          <td>${b.mass.toExponential(1)}</td>
-          <td>${spd}</td>
-          <td>${dist}</td>
-        `;
+        const nameCell = document.createElement('td');
+        const marker = document.createElement('span');
+        marker.style.color = b.color;
+        marker.textContent = '● ';
+        nameCell.appendChild(marker);
+        nameCell.appendChild(document.createTextNode(b.name));
+        const massCell = document.createElement('td');
+        massCell.textContent = b.mass.toExponential(1);
+        const speedCell = document.createElement('td');
+        speedCell.textContent = spd;
+        const distCell = document.createElement('td');
+        distCell.textContent = dist;
+        tr.append(nameCell, massCell, speedCell, distCell);
         tbody.appendChild(tr);
       });
     }

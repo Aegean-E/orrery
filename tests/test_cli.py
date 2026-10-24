@@ -418,6 +418,50 @@ class InteractiveAndTelemetryTests(unittest.TestCase):
         self.assertIn("U:", output)
         self.assertIn("2K+U:", output)
 
+    def test_web_forwards_initial_world_and_overrides(self):
+        with mock.patch("orrery.web.run_server", return_value=0) as run:
+            code, output = run_cli(
+                "web", "binary", "--no-open", "--dt", "0.5", "--time-scale", "2.0",
+                "--reverse", "--relativity", "--c-light", "10", "--k-coulomb", "0.3",
+                "--merge", "--merge-radius", "0.02",
+            )
+        self.assertEqual(code, 0)
+        self.assertEqual(output, "")
+        kwargs = run.call_args.kwargs
+        self.assertEqual(kwargs["initial_scenario"], "binary")
+        self.assertEqual(kwargs["scenario"].key, "binary")
+        self.assertFalse(kwargs["auto_open"])
+        options = kwargs["options"]
+        self.assertEqual(options.dt, 0.5)
+        self.assertEqual(options.time_scale, 2.0)
+        self.assertTrue(options.reverse)
+        self.assertTrue(options.relativity)
+        self.assertEqual(options.c_light, 10.0)
+        self.assertEqual(options.k_coulomb, 0.3)
+        self.assertEqual(options.collision_mode, "merge")
+        self.assertEqual(options.merge_radius, 0.02)
+        self.assertIsNone(options.bounce_radius)
+        self.assertIsNone(options.restitution)
+
+    def test_web_accepts_a_custom_scenario_file(self):
+        payload = {
+            "key": "web-custom",
+            "g": 1.0, "dt": 0.01, "span": 4.0, "extent": [2.0, 2.0],
+            "bodies": [
+                {"name": "A", "mass": 1.0, "position": [0.0, 0.0],
+                 "velocity": [0.0, 0.0], "symbol": "A"},
+                {"name": "B", "mass": 1.0, "position": [1.0, 0.0],
+                 "velocity": [0.0, 1.0], "symbol": "B"},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "world.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with mock.patch("orrery.web.run_server", return_value=0) as run:
+                code, output = run_cli("web", str(path), "--no-open")
+        self.assertEqual(code, 0)
+        self.assertEqual(run.call_args.kwargs["scenario"].key, "web-custom")
+
     def test_cli_invalid_physics_args_rejected(self):
         code, output = run_cli("snapshot", "solar", "--restitution", "1.5")
         self.assertEqual(code, 2)

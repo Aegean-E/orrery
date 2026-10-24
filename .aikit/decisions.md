@@ -156,3 +156,25 @@ contract, a dependency, a data format or the architecture; IDs are consecutive a
   time controls, live telemetry, and custom scenario JSON drag-and-drop loading.
 - **Consequences**: Users can explore simulations interactively both in the terminal and in any modern
   web browser without installing any external packages or npm dependencies.
+
+### ADR-011: The Web studio shares one scenario and option contract with the CLI
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**: `web KEY|FILE` only printed its argument: the browser always loaded the
+  first catalogue entry, and `--dt`, `--time-scale`, `--reverse`, relativity, Coulomb and
+  collision flags accepted by the parser were silently discarded. Uploaded scenarios were
+  validated then forgotten, so the follow-up `/api/scenario/<key>` request failed, and the
+  validate endpoint wrote a fixed temporary file into the process working directory with no
+  request-size bound.
+- **Decision**: Resolve the initial world before the server starts and expose it through
+  `/api/config`; apply `WebOptions` to every scenario payload with the same precedence as the
+  terminal (`c_light` > scenario `c` when relativity is on > no 1PN, `k_coulomb` override >
+  scenario `k_e`, `dt` override > scenario `dt`). Keep a locked per-server registry of
+  validated custom scenarios, prefixing keys that collide with built-ins, and validate uploads
+  inside a `TemporaryDirectory` after enforcing a 1 MiB `Content-Length` cap. The browser reads
+  the config before its first load, forwards warp/reverse/collision options to the client-side
+  integrator, and updates the scenario picker when an upload succeeds.
+- **Consequences**: `web solar`, `web binary` and `web world.json` open the requested world, CLI
+  physics flags affect the browser exactly as they affect the terminal, and drag-and-drop
+  scenarios remain usable for the server's lifetime. Server requests leave no files behind and
+  oversized bodies receive `413` without touching the loader.

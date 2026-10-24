@@ -7,10 +7,10 @@
 
 ## 📊 Codebase Metrics
 - **Total Python Modules**: `20`
-- **Total Classes**: `28`
-- **Total Top-Level Functions**: `72`
-- **Total Class Methods**: `188`
-- **Total Source Lines**: `5555`
+- **Total Classes**: `31`
+- **Total Top-Level Functions**: `76`
+- **Total Class Methods**: `206`
+- **Total Source Lines**: `6043`
 
 ---
 
@@ -33,7 +33,7 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `1351` lines (`58420` bytes)
+**Size**: `1370` lines (`59284` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
@@ -223,20 +223,29 @@
 ### [`orrery/web.py`](orrery/web.py)
 > *Zero-dependency HTTP server and embedded interactive Web-based UI for Orrery.*
 
-**Size**: `1122` lines (`37957` bytes)
+**Size**: `1377` lines (`49214` bytes)
 
 **Classes:**
+- `class WebOptions` - *Physics and time overrides shared by the browser and the terminal.*
+  - Method `.as_dict()` - *Return the JSON-safe view the browser consumes at startup.*
+- `class _WebState` - *Per-server state: the chosen world, overrides and uploaded scenarios.*
 - `class OrreryHandler` - *HTTP request handler serving the single-page application and JSON APIs.*
   - Method `.log_message(format, *args)` - *Suppress standard HTTP server access log to keep the terminal tidy.*
+  - Method `._state()` - *Return the state attached by run_server, or safe defaults for bare handlers.*
+  - Method `._resolve(key)`
   - Method `._send_json(status, data)`
   - Method `._send_html(content)`
   - Method `.do_GET()`
   - Method `.do_POST()`
 
 **Functions:**
-- `def _scenario_to_dict(scenario_key)`
-- `def _catalog_list()`
-- `def run_server(port, host, initial_scenario, auto_open, once)` - *Run the zero-dependency Orrery Web HTTP server.*
+- `def _scenario_overrides(scenario, options)` - *Resolve scenario defaults against CLI overrides exactly like the terminal.*
+- `def _scenario_payload(scenario, options)`
+- `def _scenario_to_dict(scenario_key, options)` - *Describe one built-in scenario using the default web overrides.*
+- `def _json_safe(value)` - *Replace non-finite floats so the response stays valid strict JSON.*
+- `def _catalog_list(state)`
+- `def _register_scenario(state, scenario)` - *Store an uploaded scenario under a key that cannot shadow a built-in one.*
+- `def run_server(port, host, initial_scenario, auto_open, once, options, scenario)` - *Run the zero-dependency Orrery Web HTTP server.*
 
 ---
 
@@ -246,7 +255,7 @@
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `495` lines (`22801` bytes)
+**Size**: `539` lines (`24904` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -295,6 +304,8 @@
   - Method `.test_cli_bounce_and_restitution_options()`
   - Method `.test_cli_coulomb_option()`
   - Method `.test_cli_telemetry_hud_energy_decomposition()`
+  - Method `.test_web_forwards_initial_world_and_overrides()`
+  - Method `.test_web_accepts_a_custom_scenario_file()`
   - Method `.test_cli_invalid_physics_args_rejected()`
   - Method `.test_cli_export_metadata_includes_bounce_and_coulomb()`
   - Method `.test_cli_time_options_dt_and_reverse()`
@@ -457,7 +468,7 @@
 ---
 
 ### [`tests/test_web.py`](tests/test_web.py)
-**Size**: `128` lines (`4955` bytes)
+**Size**: `298` lines (`11569` bytes)
 
 **Classes:**
 - `class WebApiTests`
@@ -471,5 +482,19 @@
   - Method `.test_api_validate_endpoint()`
   - Method `.test_internal_helpers()`
   - Method `.test_run_server_once()`
+- `class WebConfigTests`
+  - Method `.setUp()`
+  - Method `.tearDown()`
+  - Method `._get_json(path)`
+  - Method `._post_scenario(payload)`
+  - Method `._custom_payload(key, title)`
+  - Method `.test_config_reports_initial_world_and_options()`
+  - Method `.test_options_are_applied_to_scenario_detail()`
+  - Method `.test_relativity_override_sets_speed_of_light()`
+  - Method `.test_validated_custom_scenario_can_be_fetched()`
+  - Method `.test_custom_scenario_cannot_shadow_a_builtin_key()`
+  - Method `.test_json_safe_replaces_non_finite_floats()`
+  - Method `.test_run_server_wires_initial_scenario_and_options()`
+  - Method `.test_oversized_upload_is_refused()`
 
 ---

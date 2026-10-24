@@ -1,8 +1,9 @@
 # orrery
 
-An N-body gravitational sandbox that runs in your terminal. Six carefully chosen worlds, a
-symplectic integrator, live energy diagnostics, orbit trails, CSV and JSON export, and no
-dependencies outside the Python standard library.
+An N-body gravitational sandbox that runs in your terminal or in your browser. Nine carefully
+chosen worlds, a symplectic integrator, optional relativity and collision physics, live energy
+diagnostics, orbit trails, CSV and JSON export, and no dependencies outside the Python standard
+library.
 
 ```text
 ORRERY · Figure-Eight Choreography
@@ -108,10 +109,10 @@ python -m orrery validate FILE
 python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--dt DT] [--reverse] [--telemetry] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
 python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--dt DT] [--time-scale SCALE] [--reverse] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
 python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME] [--dt DT] [--reverse] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E]
-python -m orrery web [KEY|FILE] [--port PORT] [--host HOST] [--no-open]
+python -m orrery web [KEY|FILE] [--port PORT] [--host HOST] [--no-open] [--once] [--dt DT] [--time-scale SCALE] [--reverse] [--relativity] [--c-light C] [--k-coulomb K] [--merge] [--merge-radius R] [--bounce] [--bounce-radius R] [--restitution E]
 ```
 
-- `web` starts the zero-dependency browser-based studio at `http://127.0.0.1:8000/` and opens your default browser. Features interactive HTML5/Canvas 2D rendering, time settings (warp slider, reverse, dt), camera panning/zooming, body tracking, live telemetry charts, and custom JSON scenario drag-and-drop.
+- `web` starts the zero-dependency browser-based studio at `http://127.0.0.1:8000/` and opens your default browser. `KEY|FILE` selects the initial world (a built-in key, an alias, or a `.json` file), and the physics and time flags apply to the browser simulation exactly as they do to `run` and `export`. Features interactive HTML5/Canvas 2D rendering, time settings (warp slider, reverse, dt), camera panning/zooming, body tracking, live telemetry charts, and custom JSON scenario drag-and-drop; uploaded scenarios stay available in the picker for the server's lifetime.
 - `list --json` emits the scenario catalogue with units, extents and initial bodies.
 - `snapshot` integrates to `--at` and prints one frame. With no `--at` you get the initial state.
   A snapshot above 2,000,000 integration steps is refused unless you pass `--force`. `--reverse` and `--dt` allow fine-grained backward and custom step snapshots.
@@ -182,8 +183,11 @@ extent. It never executes code from the file.
   in the drawing code.
 - **Energy drift is visible.** The footer shows `ΔE/E` against the initial total energy. A value
   near `1e-8` after a full figure-eight period is the integrator doing its job.
-- **No collisions or relativity.** Bodies pass through one another and gravity is Newtonian. This
-  is a sandbox for orbital intuition, not a mission-design tool.
+- **Collisions and relativity are opt-in.** By default bodies pass through one another under
+  Newtonian gravity. `--relativity` adds the 1PN precession term, `--merge` coalesces contacts,
+  `--bounce` exchanges momentum with a chosen restitution, and `--k-coulomb` adds electrostatic
+  force for charged bodies. This remains a sandbox for orbital intuition, not a mission-design
+  tool.
 
 ## 📦 What's Inside
 
@@ -231,7 +235,7 @@ orrery/
 
 ## 🧪 Verification
 
-The suite is 128 tests and completes in about 2.0 seconds:
+The suite is 138 tests and completes in about 6 seconds:
 
 ```bash
 python -m unittest discover -s tests -t .
@@ -243,7 +247,8 @@ recovery for Earth, parabolic orbits, Trojan geometry, viewport aspect correctio
 narrow-terminal fitting and custom aspect ratios, golden frames for every scenario,
 custom-scenario validation and failure paths, ASCII, colour and Braille rendering, trail bounds,
 dense sampling and subcell line interpolation, every CLI command, CSV/JSON shape and final-state
-sampling, the launcher files, and the `Error/Why/Fix` failure paths.
+sampling, the launcher files, the `Error/Why/Fix` failure paths, the web config/upload endpoints,
+option overrides, custom-scenario registration and the request-size guard.
 
 CI runs the suite on Python 3.10 and 3.14 across Ubuntu, Windows and macOS, installs the
 package, runs Ruff, builds the wheel and sdist, and smoke-tests all three launchers. For local
@@ -279,7 +284,7 @@ types ship with the package (`py.typed`).
 ## 📚 Design Notes
 
 The integrator, unit policy, rendering boundary, viewport fitting and work caps are recorded in
-`.aikit/decisions.md` (ADR-001 through ADR-006).
+`.aikit/decisions.md` (ADR-001 through ADR-011).
 
 ## 📄 License
 

@@ -1238,11 +1238,30 @@ def _add_time_options(parser: argparse.ArgumentParser) -> None:
 
 
 def _cmd_web(args: argparse.Namespace) -> int:
-    from .web import run_server
+    from .web import WebOptions, run_server
+
+    _validate_physics_args(args)
+    scenario = _scenario(args.key)
+    merge = getattr(args, "merge", False)
+    bounce = getattr(args, "bounce", False)
+    options = WebOptions(
+        dt=getattr(args, "dt", None),
+        time_scale=getattr(args, "time_scale", 1.0),
+        reverse=getattr(args, "reverse", False),
+        relativity=True if getattr(args, "relativity", False) else None,
+        c_light=getattr(args, "c_light", None),
+        k_coulomb=getattr(args, "k_coulomb", None),
+        collision_mode="merge" if merge else "bounce",
+        bounce_radius=getattr(args, "bounce_radius", None) if bounce else None,
+        restitution=getattr(args, "restitution", None) if bounce else None,
+        merge_radius=getattr(args, "merge_radius", None) if merge else None,
+    )
     return run_server(
         port=args.port,
         host=args.host,
-        initial_scenario=args.key,
+        initial_scenario=scenario.key,
+        scenario=scenario,
+        options=options,
         auto_open=not args.no_open,
         once=args.once,
     )
@@ -1300,7 +1319,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_time_options(run)
     run.set_defaults(handler=_cmd_run)
 
-    export = commands.add_parser("export", help="write sampled positions to CSV")
+    export = commands.add_parser("export", help="write sampled positions to CSV or JSON")
     export.add_argument("key", help="scenario key, alias, or .json scenario file")
     export.add_argument("--out", required=True, help="destination data file")
     export.add_argument("--format", choices=("csv", "json"), default="csv",
