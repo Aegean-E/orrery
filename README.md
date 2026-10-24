@@ -102,8 +102,8 @@ more resolve to the right scenario.
 python -m orrery list [--json]
 python -m orrery info KEY|FILE [--json]
 python -m orrery validate FILE
-python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
-python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery snapshot KEY|FILE [--at TIME] [--force] [--telemetry] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
+python -m orrery run KEY|FILE [--frames N] [--fps 0.1-240] [--telemetry] [--no-controls] [--relativity] [--c-light C] [--merge] [--merge-radius R] [--dot STYLE] [--width N] [--height N] [--aspect R] [--ascii] [--no-braille] [--no-color] [--trail N | --no-trail]
 python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [--every TIME] [--relativity] [--c-light C] [--merge] [--merge-radius R]
 ```
 
@@ -113,7 +113,7 @@ python -m orrery export KEY|FILE --out FILE [--format csv|json] [--until TIME] [
 - `run` loops on a terminal; `--frames 0` loops forever, and a piped run defaults to one still.
   Frame rates are limited to `0.1`–`240` fps so a typo cannot sleep for years. `--aspect` overrides
   the assumed 2:1 character-cell ratio when your font or terminal differs.
-  Interactive keyboard controls on terminals: Space pauses/resumes, . or > steps one frame while paused, f or 1-9 tracks bodies, WASD or arrow keys pan, [ or ] zoom, 0 resets camera, n or p cycles scenarios, +/- adjusts speed, c clears trails, r resets simulation, t toggles live telemetry HUD, and q quits.
+  Interactive keyboard controls on terminals: Space pauses/resumes, . steps one frame while paused, f or 1-9 tracks bodies, WASD or arrow keys pan, [ or ] zoom, { or } calibrates aspect ratio, b cycles orbit dot styles (circle, bullet, ring, disc, dot, ascii, braille), 0 resets camera and aspect, n or p cycles scenarios, +/- adjusts speed, c clears trails, r resets simulation, t toggles live telemetry HUD, and q quits.
 - `info` prints initial distances, osculating orbital elements and energy. `--json` is stable and
   machine-readable. If no single body dominates (the figure-eight and binary worlds), the
   two-body orbit columns are deliberately blank rather than misleading.

@@ -8,9 +8,9 @@
 ## 📊 Codebase Metrics
 - **Total Python Modules**: `18`
 - **Total Classes**: `26`
-- **Total Top-Level Functions**: `62`
-- **Total Class Methods**: `145`
-- **Total Source Lines**: `3421`
+- **Total Top-Level Functions**: `63`
+- **Total Class Methods**: `149`
+- **Total Source Lines**: `3574`
 
 ---
 
@@ -33,7 +33,7 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `1064` lines (`44708` bytes)
+**Size**: `1124` lines (`47242` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
@@ -68,7 +68,7 @@
 - `def _cmd_list(args)`
 - `def _cmd_info(args)`
 - `def _sparkline(values, width, *, ascii_only)` - *Render a compact sparkline trend string for a series of numeric samples.*
-- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused, camera_label, fps)`
+- `def _compose_frame(world, scenario, viewport, recorder, initial_energy, *, ascii_only, color, braille, telemetry, energy_history, initial_momentum, controls_hint, paused, camera_label, fps, dot_char)`
 - `def _simulate(scenario, target, trail_limit, *, relativity, c_override, merge_radius)`
 - `def _cmd_snapshot(args)`
 - `def _enable_windows_ansi()` - *Enable VT processing when possible; return whether ANSI control is safe.*
@@ -106,7 +106,7 @@
 ### [`orrery/render.py`](orrery/render.py)
 > *Turn a world into a rectangular block of terminal cells.*
 
-**Size**: `235` lines (`8259` bytes)
+**Size**: `271` lines (`9310` bytes)
 
 **Classes:**
 - `class Viewport` - *A rectangular map from world units to terminal cells.*
@@ -117,12 +117,13 @@
   - Method `.subcell(point)` - *Return ``(subcolumn, subrow)`` in the 2x4 Braille grid, or ``None``.*
 
 **Functions:**
+- `def resolve_dot_char(style, *, ascii_only, encoding)` - *Resolve a dot style name or single character to a printable glyph.*
 - `def _line_cells(start, end)` - *Bresenham line in cell coordinates, including both endpoints.*
 - `def _trail_color(color_key)`
 - `def _paint_grid(grid, color)`
 - `def _set_braille(bits, colors, subcell, color_key)`
 - `def _render_braille(world, trails, viewport, color)`
-- `def render_scene(world, trails, viewport, *, ascii_only, color, braille)` - *Draw trails first, then bodies, on a fresh grid of exactly ``viewport.height`` lines.*
+- `def render_scene(world, trails, viewport, *, ascii_only, color, braille, dot_char)` - *Draw trails first, then bodies, on a fresh grid of exactly ``viewport.height`` lines.*
 - `def strip_ansi(text)` - *Remove ANSI SGR sequences, for callers that need the visible width.*
 
 ---
@@ -215,7 +216,7 @@
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `375` lines (`17455` bytes)
+**Size**: `402` lines (`18623` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -259,6 +260,8 @@
   - Method `.test_export_relativity_and_merge()`
   - Method `.test_keyboard_arrow_mapping()`
   - Method `.test_compose_frame_fps_and_step_hint()`
+  - Method `.test_cli_dot_option_snapshot()`
+  - Method `.test_run_interactive_aspect_and_dot_cycling()`
 
 **Functions:**
 - `def run_cli(*argv)`
@@ -327,7 +330,7 @@
 ---
 
 ### [`tests/test_render.py`](tests/test_render.py)
-**Size**: `92` lines (`4117` bytes)
+**Size**: `122` lines (`5680` bytes)
 
 **Classes:**
 - `class ViewportTests`
@@ -345,6 +348,8 @@
   - Method `.test_trail_samples_are_connected_with_line_cells()`
   - Method `.test_braille_trails_use_subcell_glyphs()`
   - Method `.test_trail_count_must_match_bodies()`
+  - Method `.test_render_scene_with_custom_dot_char()`
+  - Method `.test_resolve_dot_char_styles_and_fallbacks()`
 
 ---
 

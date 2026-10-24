@@ -17,7 +17,15 @@ from typing import Sequence
 
 from . import __version__
 from .custom import ScenarioFileError, load_scenario_file
-from .render import ANSI, CELL_ASPECT, RESET, Viewport, render_scene, strip_ansi
+from .render import (
+    ANSI,
+    CELL_ASPECT,
+    RESET,
+    Viewport,
+    render_scene,
+    resolve_dot_char,
+    strip_ansi,
+)
 from .scenarios import Scenario, get_scenario, scenario_keys
 from .sim import Body, Orbit, Vec2, World, orbital_elements
 from .trails import TrailRecorder
@@ -473,7 +481,8 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
                    controls_hint: bool = False,
                    paused: bool = False,
                    camera_label: str | None = None,
-                   fps: float | None = None) -> str:
+                   fps: float | None = None,
+                   dot_char: str | None = None) -> str:
     bar = "-" * viewport.width if ascii_only else "─" * viewport.width
     separator = " | " if ascii_only else " · "
     drift_label = "dE/E" if ascii_only else "ΔE/E"
@@ -481,7 +490,8 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
     title = _truncate(f"{pause_tag}ORRERY{separator}{scenario.title}", viewport.width)
     lines = [title, bar]
     lines.extend(render_scene(world, recorder.trails, viewport,
-                              ascii_only=ascii_only, color=color, braille=braille))
+                              ascii_only=ascii_only, color=color, braille=braille,
+                              dot_char=dot_char))
     lines.append(bar)
     current_drift = world.energy_drift(initial_energy)
     stats = [
@@ -516,13 +526,14 @@ def _compose_frame(world: World, scenario: Scenario, viewport: Viewport,
             legend.append(f"{body.symbol} {body.name}")
     lines.extend(_pack_tokens(legend, viewport.width))
     if controls_hint:
-        hint_text = "[Space] Pause  [.] Step  [f] Track  [WASD] Pan  [[]] Zoom  [n/p] World  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
+        hint_text = "[Space] Pause  [.] Step  [f] Track  [WASD] Pan  [[]] Zoom  [{}] Aspect  [b] Dots  [n/p] World  [C] Clear  [R] Reset  [T] Telemetry  [Q] Quit"
         if len(hint_text) <= viewport.width:
             lines.append(hint_text)
         else:
             lines.extend(_pack_tokens([
                 "[Space] Pause", "[.] Step", "[f] Track", "[WASD] Pan", "[[]] Zoom",
-                "[n/p] World", "[C] Clear", "[R] Reset", "[T] Telemetry", "[Q] Quit",
+                "[{}] Aspect", "[b] Dots", "[n/p] World", "[C] Clear", "[R] Reset",
+                "[T] Telemetry", "[Q] Quit",
             ], viewport.width, separator="  "))
     return "\n".join(lines)
 
@@ -570,13 +581,24 @@ def _cmd_snapshot(args: argparse.Namespace) -> int:
     if color:
         color = _enable_windows_ansi()
     ascii_only = not _unicode_enabled(args)
-    braille = (not ascii_only) and not getattr(args, "no_braille", False)
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    dot_arg = getattr(args, "dot", None)
+    if dot_arg == "braille":
+        braille = not ascii_only
+        dot_char = None
+    elif dot_arg is not None:
+        braille = False
+        dot_char = resolve_dot_char(dot_arg, ascii_only=ascii_only, encoding=encoding)
+    else:
+        braille = (not ascii_only) and not getattr(args, "no_braille", False)
+        dot_char = None
     frame = _compose_frame(
         world, scenario, viewport, recorder, initial_energy,
         ascii_only=ascii_only, color=color, braille=braille,
         telemetry=getattr(args, "telemetry", False),
         energy_history=[world.energy_drift(initial_energy)],
         initial_momentum=world.angular_momentum(),
+        dot_char=dot_char,
     )
     print(frame)
     return 0
@@ -628,6 +650,18 @@ def _cmd_run(args: argparse.Namespace) -> int:
         color = False
     screen_control = interactive and vt_ready
     aspect = _aspect(args)
+    initial_aspect = aspect
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    dot_styles_cycle = ["braille", "circle", "bullet", "ring", "disc", "dot", "ascii"]
+    dot_arg = getattr(args, "dot", None)
+    if dot_arg is not None:
+        dot_style = dot_arg
+    elif braille:
+        dot_style = "braille"
+    else:
+        dot_style = "ascii" if ascii_only else "dot"
+    initial_dot_style = dot_style
+
     relativity = getattr(args, "relativity", False)
     c_override = getattr(args, "c_light", None)
     merge_radius = getattr(args, "merge_radius", 0.0) if getattr(args, "merge", False) else 0.0
@@ -667,12 +701,21 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         break
                     if key == " ":
                         paused = not paused
-                    elif key in (".", ">"):
+                    elif key == ".":
                         single_step = True
                     elif key in ("+", "="):
                         fps = min(MAX_FPS, fps * 1.5)
                     elif key in ("-", "_"):
                         fps = max(MIN_FPS, fps / 1.5)
+                    elif key in ("{", "<"):
+                        aspect = max(0.5, round(aspect - 0.05, 2))
+                    elif key in ("}", ">"):
+                        aspect = min(5.0, round(aspect + 0.05, 2))
+                    elif key in ("b", "B"):
+                        idx = dot_styles_cycle.index(dot_style) if dot_style in dot_styles_cycle else 0
+                        dot_style = dot_styles_cycle[(idx + 1) % len(dot_styles_cycle)]
+                        if dot_style == "braille" and ascii_only:
+                            dot_style = "circle"
                     elif key in ("c", "C"):
                         recorder.clear(world)
                     elif key in ("r", "R"):
@@ -702,6 +745,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         tracking_index = None
                         pan_offset = Vec2()
                         zoom_factor = 1.0
+                        aspect = initial_aspect
+                        dot_style = initial_dot_style
                     elif key in "123456789":
                         digit = int(key) - 1
                         if digit < len(world.bodies):
@@ -752,6 +797,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         energy_history.pop(0)
                     single_step = False
 
+                if dot_style == "braille" and not ascii_only:
+                    current_braille = True
+                    dot_char = None
+                else:
+                    current_braille = False
+                    dot_char = resolve_dot_char(dot_style, ascii_only=ascii_only, encoding=encoding)
+
                 if tracking_index is not None and tracking_index < len(world.bodies):
                     center_pos = world.bodies[tracking_index].pos + pan_offset
                 else:
@@ -769,13 +821,17 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     cam_tokens.append(f"{1.0 / zoom_factor:.1f}x")
                 if pan_offset.norm() > 1e-4:
                     cam_tokens.append("panned")
+                if abs(aspect - initial_aspect) > 0.01:
+                    cam_tokens.append(f"asp={aspect:.2f}")
+                if dot_style != initial_dot_style:
+                    cam_tokens.append(f"dot={dot_style}")
                 camera_label = " ".join(cam_tokens) if cam_tokens else None
 
                 if screen_control:
                     sys.stdout.write("\x1b[H\x1b[2J")
                 sys.stdout.write(_compose_frame(
                     world, scenario, viewport, recorder, initial_energy,
-                    ascii_only=ascii_only, color=color, braille=braille,
+                    ascii_only=ascii_only, color=color, braille=current_braille,
                     telemetry=telemetry_enabled,
                     energy_history=energy_history,
                     initial_momentum=initial_momentum,
@@ -783,6 +839,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     paused=paused,
                     camera_label=camera_label,
                     fps=fps,
+                    dot_char=dot_char,
                 ) + "\n")
                 sys.stdout.flush()
                 if frames == 0 or frame_index < frames:
@@ -966,6 +1023,9 @@ def _add_view_options(parser: argparse.ArgumentParser, *, trails: bool = False) 
                             help="number of recorded positions per body")
         parser.add_argument("--no-trail", action="store_true",
                             help="hide orbit trails")
+        parser.add_argument("--dot", default=None,
+                            choices=("braille", "circle", "bullet", "ring", "disc", "dot", "ascii"),
+                            help="orbit dot style: braille, circle, bullet, ring, disc, dot, ascii")
 
 
 def _add_physics_options(parser: argparse.ArgumentParser) -> None:

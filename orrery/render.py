@@ -40,6 +40,38 @@ TRAIL_ANSI = {
 }
 TRAIL_UNICODE = "·"
 TRAIL_ASCII = "."
+TRAIL_DOT_STYLES: dict[str, tuple[str, str]] = {
+    "circle": ("○", "o"),
+    "bullet": ("•", "o"),
+    "ring": ("◦", "o"),
+    "disc": ("●", "o"),
+    "dot": ("·", "."),
+    "ascii": (".", "."),
+}
+
+
+def resolve_dot_char(style: str | None, *, ascii_only: bool = False,
+                     encoding: str = "utf-8") -> str:
+    """Resolve a dot style name or single character to a printable glyph."""
+    if not style:
+        return "." if ascii_only else "·"
+    if style in TRAIL_DOT_STYLES:
+        uni, asc = TRAIL_DOT_STYLES[style]
+    elif len(style) == 1:
+        uni, asc = style, style
+    else:
+        uni, asc = "·", "."
+    if ascii_only:
+        return asc
+    try:
+        uni.encode(encoding)
+        return uni
+    except (UnicodeEncodeError, LookupError):
+        try:
+            "•".encode(encoding)
+            return "•"
+        except (UnicodeEncodeError, LookupError):
+            return asc
 CELL_ASPECT = 2.0
 BRAILLE_BITS = (
     (0x01, 0x08),
@@ -196,13 +228,17 @@ def _render_braille(world: World, trails: Sequence[Sequence[Vec2]], viewport: Vi
 
 def render_scene(world: World, trails: Sequence[Sequence[Vec2]], viewport: Viewport,
                  *, ascii_only: bool = False, color: bool = False,
-                 braille: bool = False) -> list[str]:
+                 braille: bool = False,
+                 dot_char: str | None = None) -> list[str]:
     """Draw trails first, then bodies, on a fresh grid of exactly ``viewport.height`` lines."""
     if len(trails) != len(world.bodies):
         raise ValueError("there must be one trail per body")
     if braille:
         return _render_braille(world, trails, viewport, color)
-    trail_char = TRAIL_ASCII if ascii_only else TRAIL_UNICODE
+    if dot_char is not None:
+        trail_char = dot_char
+    else:
+        trail_char = TRAIL_ASCII if ascii_only else TRAIL_UNICODE
     grid: list[list[tuple[str, str | None]]] = [
         [(" ", None) for _ in range(viewport.width)] for _ in range(viewport.height)
     ]

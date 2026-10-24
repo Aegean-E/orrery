@@ -1,6 +1,12 @@
 import unittest
 
-from orrery.render import Viewport, render_scene, strip_ansi
+from orrery.render import (
+    TRAIL_DOT_STYLES,
+    Viewport,
+    render_scene,
+    resolve_dot_char,
+    strip_ansi,
+)
 from orrery.sim import Body, Vec2, World
 
 
@@ -86,6 +92,30 @@ class RenderSceneTests(unittest.TestCase):
     def test_trail_count_must_match_bodies(self):
         with self.assertRaises(ValueError):
             render_scene(self.world, self.trails[:1], self.viewport)
+
+    def test_render_scene_with_custom_dot_char(self):
+        world = World((Body("Probe", 1.0, Vec2(0.0, 0.9), Vec2(), "P"),), 1.0)
+        trails = [[Vec2(-0.5, 0.0), Vec2(0.5, 0.0)]]
+        lines_circle = render_scene(world, trails, self.viewport, dot_char="○")
+        self.assertEqual(lines_circle[10][10], "○")
+        lines_bullet = render_scene(world, trails, self.viewport, dot_char="•")
+        self.assertEqual(lines_bullet[10][10], "•")
+
+    def test_resolve_dot_char_styles_and_fallbacks(self):
+        self.assertIn("circle", TRAIL_DOT_STYLES)
+        self.assertIn("bullet", TRAIL_DOT_STYLES)
+        self.assertEqual(resolve_dot_char("circle", encoding="utf-8"), "○")
+        self.assertEqual(resolve_dot_char("bullet", encoding="utf-8"), "•")
+        self.assertEqual(resolve_dot_char("ring", encoding="utf-8"), "◦")
+        self.assertEqual(resolve_dot_char("disc", encoding="utf-8"), "●")
+        self.assertEqual(resolve_dot_char("dot", encoding="utf-8"), "·")
+        self.assertEqual(resolve_dot_char("ascii", encoding="utf-8"), ".")
+        self.assertEqual(resolve_dot_char("circle", ascii_only=True), "o")
+        self.assertEqual(resolve_dot_char("circle", encoding="ascii"), "o")
+        self.assertEqual(resolve_dot_char("bullet", encoding="cp1254"), "•")
+        self.assertEqual(resolve_dot_char("x", encoding="utf-8"), "x")
+        self.assertEqual(resolve_dot_char(None), "·")
+        self.assertEqual(resolve_dot_char(None, ascii_only=True), ".")
 
 
 if __name__ == "__main__":

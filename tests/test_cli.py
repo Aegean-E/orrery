@@ -369,6 +369,33 @@ class InteractiveAndTelemetryTests(unittest.TestCase):
         )
         self.assertIn("fps = 24.0", frame)
         self.assertIn("[.] Step", frame)
+        self.assertIn("[{}] Aspect", frame)
+        self.assertIn("[b] Dots", frame)
+
+    def test_cli_dot_option_snapshot(self):
+        code, output = run_cli("snapshot", "solar", "--dot", "circle",
+                               "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertIn("ORRERY |", output)
+
+        code, output = run_cli("snapshot", "solar", "--dot", "ascii",
+                               "--ascii", "--no-color")
+        self.assertEqual(code, 0)
+        self.assertIn("ORRERY |", output)
+
+    def test_run_interactive_aspect_and_dot_cycling(self):
+        keys = iter(["{", "}", "b", "0", "q"])
+
+        def fake_poll(self):
+            return next(keys, None)
+
+        with mock.patch.object(KeyboardReader, "poll", fake_poll):
+            with mock.patch("sys.stdout.isatty", return_value=True):
+                with mock.patch("sys.stdin.isatty", return_value=True):
+                    code, output = run_cli("run", "solar", "--frames", "0",
+                                           "--ascii", "--no-color")
+                    self.assertEqual(code, 0)
+                    self.assertIn("Stopped at t =", output)
 
 
 if __name__ == "__main__":

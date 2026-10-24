@@ -108,3 +108,18 @@ contract, a dependency, a data format or the architecture; IDs are consecutive a
   and parse Windows two-byte scan codes and POSIX ANSI sequences for arrow key camera panning.
 - **Consequences**: Scientific data exports match visual simulation physics identically. Paused simulations
   can be inspected frame-by-frame with zero overshoot. Backward compatibility is fully preserved.
+
+### ADR-008: Circular orbit dot styles and interactive aspect ratio calibration
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**: Orbit trails were previously rendered either as continuous Braille line strokes or as
+  tiny middle dots (`·`) / periods (`.`), which did not present round, circular points. Furthermore,
+  the fixed terminal cell aspect ratio of 2.0 vertically stretched circular orbits (such as Earth or
+  Lagrange) into tall ellipses on modern terminal fonts with standard 1.2–1.4 line heights.
+- **Decision**: Introduce selectable orbit dot styles (`circle` for `○`/`o`, `bullet` for `•`,
+  `ring` for `◦`, `disc` for `●`, `dot` for `·`, and `ascii` for `.`), with automatic encoding
+  fallback across UTF-8, CP1254, and ASCII. Add interactive key `b` in `run` mode to cycle dot styles
+  live, and add `{` / `}` to interactively calibrate the cell aspect ratio in increments
+  of 0.05, allowing users to make orbits almost exact geometric circles on any monitor and font.
+- **Consequences**: Users can dial in perfect circular orbit geometry and select circular dot markers
+  with immediate HUD feedback (`asp=X.XX`, `dot=...`). Backward compatibility is fully preserved.
