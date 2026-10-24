@@ -210,9 +210,10 @@ orrery/
 │   ├── custom.py             <- strict JSON scenario loader
 │   ├── py.typed              <- inline type information for library users
 │   ├── render.py             <- viewport, ANSI painting, pure frame rendering
-│   ├── scenarios.py          <- the five worlds and their units
+│   ├── scenarios.py          <- the nine worlds and their units
 │   ├── sim.py                <- vectors, bodies, leapfrog, diagnostics
-│   └── trails.py             <- bounded, sampled position history
+│   ├── trails.py             <- bounded, sampled position history
+│   └── web.py                <- zero-dependency HTTP server and browser UI
 └── tests/
     ├── __init__.py
     ├── golden/               <- deterministic ASCII frames per scenario
@@ -224,12 +225,13 @@ orrery/
     ├── test_render.py
     ├── test_scenarios.py
     ├── test_sim.py
-    └── test_trails.py
+    ├── test_trails.py
+    └── test_web.py
 ```
 
 ## 🧪 Verification
 
-The suite is 90 tests and completes in about 1.3 seconds:
+The suite is 127 tests and completes in about 2.5 seconds:
 
 ```bash
 python -m unittest discover -s tests -t .
