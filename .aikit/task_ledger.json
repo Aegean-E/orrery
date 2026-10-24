@@ -1,46 +1,14 @@
 {
   "version": 1,
   "active_task": {
-    "task_id": "orrery-v5",
+    "task_id": "orrery-v6",
     "last_phase": "phase 4",
     "active_phase": 5,
     "status": "completed",
-    "updated_at": 1792858062.7320294,
-    "completed_at": 1792858090.1261005
+    "updated_at": 1792859099.9782417,
+    "completed_at": 1792859122.3188286
   },
   "checkpoints": [
-    {
-      "task_id": "orrery-v1",
-      "phase": "phase 2",
-      "phase_num": 2,
-      "description": "[1/4] Plan: dependency-free N-body orbital sandbox with leapfrog core, 4 scenarios, terminal renderer, CLI, CSV export and regression tests",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792698532.0152206,
-      "timestamp_str": "2026-10-22 22:48:52",
-      "impact_assessment": {
-        "why": "The user asked for a new project from scratch; AIKit's projects/ is the intended home and a self-contained physics toy gives a runnable, testable result.",
-        "benefits": "Zero-dependency, local-first, educational, visually immediate, and fully unit-testable through a pure simulation core.",
-        "risks": "contract: new project, no existing contract to break; dependency: none, Python standard library only; concurrency: none, single-process CLI with no shared state; state: output is stateless and CSV export is user-owned",
-        "mitigation": "ASCII fallback plus color detection, capped viewport sizes, symplectic integrator, a known figure-eight benchmark, and a four-milestone scope."
-      }
-    },
-    {
-      "task_id": "orrery-v1",
-      "phase": "phase 4",
-      "phase_num": 4,
-      "description": "[4/4] Built Orrery with leapfrog N-body core, four scenarios, ASCII/ANSI renderer, CLI (list/info/snapshot/run/export), README, ADRs; 40 tests pass; 4/4 gates pass; checklists: passed",
-      "files_affected": [],
-      "status": "in_progress",
-      "timestamp": 1792701663.6486478,
-      "timestamp_str": "2026-10-22 23:41:03",
-      "handoff": {
-        "state": "implementation complete, worktree intentionally uncommitted",
-        "next": "review and commit or publish",
-        "open": "no remote configured",
-        "evidence": "python -m unittest discover -s tests -t . and python aikit.py check orrery"
-      }
-    },
     {
       "task_id": "orrery-v1",
       "phase": "phase 4",
@@ -262,6 +230,41 @@
       "status": "completed",
       "timestamp": 1792858090.1261024,
       "timestamp_str": "2026-10-24 19:08:10"
+    },
+    {
+      "task_id": "orrery-v6",
+      "phase": "phase 1",
+      "phase_num": 1,
+      "description": "Implement circular orbit dots and interactive aspect ratio tuning",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792858767.2167668,
+      "timestamp_str": "2026-10-24 19:19:27",
+      "impact_assessment": {
+        "why": "User requested circle-like orbit dots and almost circular orbit geometry",
+        "benefits": "Supports circle/bullet/ring/disc glyphs and interactive aspect ratio calibration",
+        "risks": "Terminal encoding incompatibilities with Unicode glyphs",
+        "mitigation": "Automatic fallback to ASCII and CP1254-compatible glyphs"
+      }
+    },
+    {
+      "task_id": "orrery-v6",
+      "phase": "phase 4",
+      "phase_num": 4,
+      "description": "Implement circular orbit dots and interactive aspect ratio tuning",
+      "files_affected": [],
+      "status": "in_progress",
+      "timestamp": 1792859099.9782417,
+      "timestamp_str": "2026-10-24 19:24:59"
+    },
+    {
+      "task_id": "orrery-v6",
+      "phase": "completed",
+      "phase_num": 5,
+      "description": "Task 'orrery-v6' completed successfully.",
+      "status": "completed",
+      "timestamp": 1792859122.31883,
+      "timestamp_str": "2026-10-24 19:25:22"
     }
   ]
 }
