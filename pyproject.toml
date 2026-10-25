@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
-authors = [{ name = "AI Assistant" }]
+authors = [{ name = "Aegean-E", email = "aegean-licensing@proton.me" }]
 keywords = ["astronomy", "n-body", "orbital-mechanics", "terminal", "simulation"]
 classifiers = [
     "Environment :: Console",
