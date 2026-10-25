@@ -213,6 +213,7 @@ orrery/
 ├── .gitignore
 ├── LICENSE                   <- AGPL-3.0-or-later
 ├── README.md
+├── COMMERCIAL.md
 ├── examples/
 │   └── custom-two-body.json  <- editable example scenario
 ├── pyproject.toml            <- package metadata and the `orrery` console script
