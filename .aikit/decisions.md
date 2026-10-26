@@ -178,3 +178,8 @@ contract, a dependency, a data format or the architecture; IDs are consecutive a
   physics flags affect the browser exactly as they affect the terminal, and drag-and-drop
   scenarios remain usable for the server's lifetime. Server requests leave no files behind and
   oversized bodies receive `413` without touching the loader.
+## Licensing migration (v1.0.0-agpl)
+
+- New versions use Aegean Science License 1.1 (ASL-1.1); versions at or before `v1.0.0-agpl` remain AGPL-3.0.
+- Rights holder: AegeanWorks; internal AI commit identity `assistant@local`.
+- Counsel review of the 1.1 texts remains pending.

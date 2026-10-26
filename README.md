@@ -1,4 +1,4 @@
-# orrery
+# Orrery
 
 An N-body gravitational sandbox that runs in your terminal or in your browser. Nine carefully
 chosen worlds, a symplectic integrator, optional relativity and collision physics, live energy
@@ -211,7 +211,12 @@ orrery/
 │       └── ci.yml            <- Python 3.10/3.14 matrix on Linux, Windows and macOS
 ├── .gitattributes            <- launcher line-ending policy
 ├── .gitignore
-├── LICENSE                   <- AGPL-3.0-or-later
+├── LICENSE                   <- Aegean Science License 1.1 (ASL-1.1): free non-commercial research
+├── LICENSES/                 <- REUSE license texts
+├── REUSE.toml                <- Machine-readable SPDX metadata
+├── CHANGELOG.md              <- Version history and license transition
+├── ASSETS.md                 <- Asset/data manifest: what the license covers
+
 ├── README.md
 ├── COMMERCIAL.md
 ├── examples/
@@ -302,6 +307,8 @@ types ship with the package (`py.typed`).
 The integrator, unit policy, rendering boundary, viewport fitting and work caps are recorded in
 `.aikit/decisions.md` (ADR-001 through ADR-011).
 
-## 📄 License
+> **License history:** versions released before `v1.0.0-agpl` remain available under GNU AGPL-3.0.
 
-Orrery is licensed under the GNU Affero General Public License v3.0 or later. See `LICENSE`.
+## 📜 License
+
+Free for non-commercial research and teaching under the Aegean Science License 1.1 (ASL-1.1); see [LICENSE](LICENSE). It allows publication, reproducibility sharing, text/data mining and non-commercial ML training. Commercial or industry-sponsored use needs the Aegean Commercial License 1.0 (ACL-1.0); see [COMMERCIAL.md](COMMERCIAL.md).

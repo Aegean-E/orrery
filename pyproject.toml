@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orrery-cli"
-version = "1.0.0"
+version = "1.1.0"
 description = "A zero-dependency N-body orbital sandbox for the terminal"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "AGPL-3.0-or-later"
+license = "LicenseRef-ASL-1.1"
 license-files = ["LICENSE"]
 authors = [{ name = "Aegean-E", email = "aegean-licensing@proton.me" }]
 keywords = ["astronomy", "n-body", "orbital-mechanics", "terminal", "simulation"]
