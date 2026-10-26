@@ -2,7 +2,6 @@
 
 > This project is free for non-commercial research under the **Aegean Science License 1.1 (ASL-1.1)** in [LICENSE](LICENSE). Every commercial or
 > organizational use needs the paid **Aegean Commercial License 1.0 (ACL-1.0)**. Project Data and model weights need a separate written data/weights grant.
-> Versions up to and including `v1.0.0-agpl` remain available under GNU AGPL-3.0.
 
 ---
 

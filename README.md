@@ -306,8 +306,6 @@ types ship with the package (`py.typed`).
 The integrator, unit policy, rendering boundary, viewport fitting and work caps are recorded in
 `.aikit/decisions.md` (ADR-001 through ADR-011).
 
-> **License history:** versions up to and including `v1.0.0-agpl` remain available under GNU AGPL-3.0.
-
 ## 📜 License
 
 Free for non-commercial research and teaching under the Aegean Science License 1.1 (ASL-1.1); see [LICENSE](LICENSE). It allows publication, reproducibility sharing, text/data mining and non-commercial ML training. Commercial or industry-sponsored use needs the Aegean Commercial License 1.0 (ACL-1.0); see [COMMERCIAL.md](COMMERCIAL.md).
