@@ -216,7 +216,6 @@ orrery/
 ├── REUSE.toml                <- Machine-readable SPDX metadata
 ├── CHANGELOG.md              <- Version history and license transition
 ├── ASSETS.md                 <- Asset/data manifest: what the license covers
-
 ├── README.md
 ├── COMMERCIAL.md
 ├── examples/
@@ -307,7 +306,7 @@ types ship with the package (`py.typed`).
 The integrator, unit policy, rendering boundary, viewport fitting and work caps are recorded in
 `.aikit/decisions.md` (ADR-001 through ADR-011).
 
-> **License history:** versions released before `v1.0.0-agpl` remain available under GNU AGPL-3.0.
+> **License history:** versions up to and including `v1.0.0-agpl` remain available under GNU AGPL-3.0.
 
 ## 📜 License
 
