@@ -1,5 +1,10 @@
 # Orrery
 
+<!-- aegean:media:start -->
+<p align="center"><img src="assets/logo.svg" alt="Orrery logo" width="96" height="96"></p>
+<p align="center"><img src="assets/social-preview.svg" alt="Orrery social preview" width="100%"></p>
+<!-- aegean:media:end -->
+
 An N-body gravitational sandbox that runs in your terminal or in your browser. Nine carefully
 chosen worlds, a symplectic integrator, optional relativity and collision physics, live energy
 diagnostics, orbit trails, CSV and JSON export, and no dependencies outside the Python standard
