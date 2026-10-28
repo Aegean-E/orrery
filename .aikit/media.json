@@ -17,35 +17,35 @@
       "path": "assets/logo.png",
       "status": "approved",
       "commit": "",
-      "generated_at": "2026-10-28T11:43:42",
+      "generated_at": "2026-10-28T13:53:41",
       "review": {
         "status": "approved",
-        "reviewer": "subagent:vision-review",
+        "reviewer": "subagent:brand-review",
         "method": "vision",
-        "notes": "Monogram OR matches project; legible, unclipped, no overlaps/watermark, premium.",
-        "score": 90,
-        "reviewed_at": "2026-10-28T11:49:30"
+        "notes": "OR monogram, ASTRONOMY eyebrow, single-word title case Orrery. Orbital/solar-system artwork is a perfect fit for an n-body orbital simulator. Premium.",
+        "score": 94,
+        "reviewed_at": "2026-10-28T14:00:01"
       }
     },
     "social_preview": {
       "path": "assets/social-preview.png",
       "status": "approved",
       "commit": "",
-      "generated_at": "2026-10-28T11:43:42",
+      "generated_at": "2026-10-28T13:53:41",
       "review": {
         "status": "approved",
-        "reviewer": "subagent:vision-review",
+        "reviewer": "subagent:brand-review",
         "method": "vision",
-        "notes": "Strong hierarchy; legible, unclipped; premium card, no watermark.",
-        "score": 89,
-        "reviewed_at": "2026-10-28T11:49:30"
+        "notes": "Title 'Orrery' crisp; tagline 'Build and watch n-body orbital systems.' complete; chips readable; URL legible; eclipse/orbital imagery fits astronomy simulator; no clipping.",
+        "score": 92,
+        "reviewed_at": "2026-10-28T14:00:01"
       }
     },
     "artwork": {
       "path": "assets/artwork.jpg",
       "status": "pending_review",
       "commit": "",
-      "generated_at": "2026-10-28T11:43:42",
+      "generated_at": "2026-10-28T13:34:26",
       "review": null
     }
   },
