@@ -1,8 +1,8 @@
 # Orrery
 
 <!-- aegean:media:start -->
-<p align="center"><img src="assets/logo.jpg" alt="Orrery logo" width="96" height="96"></p>
 <p align="center"><img src="assets/social-preview.png" alt="Orrery social preview" width="100%"></p>
+*Brand assets are generated and may not fully represent the project scope.*
 <!-- aegean:media:end -->
 
 An N-body gravitational sandbox that runs in your terminal or in your browser. Nine carefully
