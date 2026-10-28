@@ -15,6 +15,10 @@
   "ui_source": "detected",
   "topics": [
     "aikit",
+    "source-available",
+    "aegean-science-license",
+    "research",
+    "commercial-license",
     "astronomy",
     "gravity",
     "n-body",
@@ -22,7 +26,6 @@
     "physics-simulation",
     "python",
     "science",
-    "source-available",
     "symplectic-integrator",
     "terminal",
     "zero-dependencies",
@@ -30,10 +33,7 @@
     "astrophysics",
     "command-line-tool",
     "simulation",
-    "software",
-    "visualization",
-    "scientific-computing",
-    "space"
+    "visualization"
   ],
   "topics_source": "ai:kilo:2026-10-27",
   "topics_reviewed_at": "2026-10-28",
@@ -57,5 +57,11 @@
   ],
   "topics_choice_round4": [
     "space"
+  ],
+  "license_topics": [
+    "source-available",
+    "aegean-science-license",
+    "research",
+    "commercial-license"
   ]
 }

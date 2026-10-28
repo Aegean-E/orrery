@@ -2,7 +2,6 @@
 
 <!-- aegean:media:start -->
 <p align="center"><img src="assets/social-preview.png" alt="Orrery social preview" width="100%"></p>
-*The banner and logo are AI-generated brand assets. They are illustrative and may not literally depict every feature or the full project scope.*
 <!-- aegean:media:end -->
 
 An N-body gravitational sandbox that runs in your terminal or in your browser. Nine carefully
@@ -310,6 +309,12 @@ types ship with the package (`py.typed`).
 
 The integrator, unit policy, rendering boundary, viewport fitting and work caps are recorded in
 `.aikit/decisions.md` (ADR-001 through ADR-011).
+
+<!-- aegean:brand-assets:start -->
+## 🎨 Brand Assets
+
+> **AI-Generated Brand Artwork.** The banner and logo are **AI-generated brand assets**. They are illustrative and may not literally depict every feature or the full project scope.
+<!-- aegean:brand-assets:end -->
 
 ## 📜 License
 
