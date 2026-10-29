@@ -220,6 +220,18 @@ class WebConfigTests(unittest.TestCase):
         _, data = self._get_json("/api/scenario/black-hole")
         self.assertEqual(data["c"], 5.0)
 
+    def test_scenario_detail_uses_the_effective_coulomb_constant(self):
+        self.server.state.options = WebOptions(k_coulomb=0.01)
+        _, data = self._get_json("/api/scenario/bohr")
+        electron = next(b for b in data["bodies"] if b["name"] == "Electron-1")
+        self.assertAlmostEqual(electron["semi_major"], 0.792, delta=0.01)
+        self.assertLess(electron["eccentricity"], 0.05)
+
+        self.server.state.options = WebOptions(k_coulomb=0.5)
+        _, data = self._get_json("/api/scenario/bohr")
+        electron = next(b for b in data["bodies"] if b["name"] == "Electron-1")
+        self.assertGreater(electron["eccentricity"], 0.5)
+
     def test_validated_custom_scenario_can_be_fetched(self):
         status, data = self._post_scenario(self._custom_payload())
         self.assertEqual(status, 200)

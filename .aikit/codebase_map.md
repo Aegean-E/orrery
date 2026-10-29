@@ -9,8 +9,8 @@
 - **Total Python Modules**: `20`
 - **Total Classes**: `31`
 - **Total Top-Level Functions**: `76`
-- **Total Class Methods**: `214`
-- **Total Source Lines**: `6122`
+- **Total Class Methods**: `215`
+- **Total Source Lines**: `6134`
 
 ---
 
@@ -223,7 +223,7 @@
 ### [`orrery/web.py`](orrery/web.py)
 > *Zero-dependency HTTP server and embedded interactive Web-based UI for Orrery.*
 
-**Size**: `1377` lines (`49214` bytes)
+**Size**: `1377` lines (`49219` bytes)
 
 **Classes:**
 - `class WebOptions` - *Physics and time overrides shared by the browser and the terminal.*
@@ -476,7 +476,7 @@
 ---
 
 ### [`tests/test_web.py`](tests/test_web.py)
-**Size**: `298` lines (`11569` bytes)
+**Size**: `310` lines (`12226` bytes)
 
 **Classes:**
 - `class WebApiTests`
@@ -499,6 +499,7 @@
   - Method `.test_config_reports_initial_world_and_options()`
   - Method `.test_options_are_applied_to_scenario_detail()`
   - Method `.test_relativity_override_sets_speed_of_light()`
+  - Method `.test_scenario_detail_uses_the_effective_coulomb_constant()`
   - Method `.test_validated_custom_scenario_can_be_fetched()`
   - Method `.test_custom_scenario_cannot_shadow_a_builtin_key()`
   - Method `.test_json_safe_replaces_non_finite_floats()`

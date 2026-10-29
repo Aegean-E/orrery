@@ -104,7 +104,7 @@ def _scenario_payload(scenario: Scenario, options: WebOptions) -> dict[str, obje
     bodies_payload = []
     for i, b in enumerate(world.bodies):
         meaningful = i != dominant_index and dominant
-        orbit = orbital_elements(primary, b, scenario.g) if meaningful else None
+        orbit = orbital_elements(primary, b, scenario.g, k_e) if meaningful else None
         bodies_payload.append({
             "name": b.name,
             "mass": b.mass,
