@@ -390,12 +390,21 @@ class World:
         return (self.total_energy() - initial_energy) / abs(initial_energy)
 
 
-def orbital_elements(primary: Body, body: Body, g: float) -> Orbit:
-    """Osculating semi-major axis, eccentricity and period of ``body`` around ``primary``."""
+def orbital_elements(primary: Body, body: Body, g: float,
+                     k_e: float = 0.0) -> Orbit:
+    """Osculating semi-major axis, eccentricity and period of ``body`` around ``primary``.
+
+    ``k_e`` adds the Coulomb term to the two-body parameter. A net repulsive pair
+    has no finite osculating conic here and returns empty elements.
+    """
     relative_position = body.pos - primary.pos
     relative_velocity = body.vel - primary.vel
     radius = relative_position.norm()
     mu = g * (primary.mass + body.mass)
+    if k_e != 0.0 and primary.charge != 0.0 and body.charge != 0.0:
+        mu -= k_e * primary.charge * body.charge * (
+            1.0 / primary.mass + 1.0 / body.mass
+        )
     if radius <= 0.0 or mu <= 0.0:
         return Orbit(None, None, None)
     speed_sq = relative_velocity.norm_sq()

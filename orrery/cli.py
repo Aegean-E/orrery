@@ -222,7 +222,8 @@ def _dominant_primary(world: World) -> bool:
 def _body_payload(scenario: Scenario, body: Body, primary: Body, index: int,
                   primary_index: int, dominant: bool) -> dict[str, object]:
     meaningful = index != primary_index and dominant
-    orbit = orbital_elements(primary, body, scenario.g) if meaningful else Orbit(None, None, None)
+    orbit = (orbital_elements(primary, body, scenario.g, scenario.k_e)
+             if meaningful else Orbit(None, None, None))
     distance = 0.0 if index == primary_index else body.pos.distance_to(primary.pos)
     return {
         "name": body.name,
@@ -371,7 +372,7 @@ def _cmd_info(args: argparse.Namespace) -> int:
             distance = f"{body.pos.distance_to(primary.pos):.4f}"
             if dominant:
                 semi_major, eccentricity, period = _orbit_text(
-                    orbital_elements(primary, body, scenario.g)
+                    orbital_elements(primary, body, scenario.g, scenario.k_e)
                 )
             else:
                 semi_major, eccentricity, period = "-", "-", "-"
@@ -1228,11 +1229,13 @@ def _add_physics_options(parser: argparse.ArgumentParser) -> None:
                         help="coefficient of restitution for elastic bounce (0.0 to 1.0, default: 1.0)")
 
 
-def _add_time_options(parser: argparse.ArgumentParser) -> None:
+def _add_time_options(parser: argparse.ArgumentParser, *, warp: bool = True) -> None:
     parser.add_argument("--dt", type=float, default=None,
                         help="integration time step override (positive number)")
-    parser.add_argument("--time-scale", "--warp", dest="time_scale", type=float, default=1.0,
-                        help="simulation time rate multiplier (default: 1.0)")
+    if warp:
+        parser.add_argument("--time-scale", "--warp", dest="time_scale", type=float,
+                            default=1.0,
+                            help="simulation time rate multiplier (default: 1.0)")
     parser.add_argument("--reverse", action="store_true",
                         help="run simulation backward in time")
 
@@ -1300,7 +1303,7 @@ def build_parser() -> argparse.ArgumentParser:
                           help="display live energy drift trend in footer")
     _add_view_options(snapshot, trails=True)
     _add_physics_options(snapshot)
-    _add_time_options(snapshot)
+    _add_time_options(snapshot, warp=False)
     snapshot.set_defaults(handler=_cmd_snapshot)
 
     run = commands.add_parser("run", help="animate a scenario in the terminal")
@@ -1329,7 +1332,7 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--every", type=float, default=None,
                         help="sampling interval in simulation time")
     _add_physics_options(export)
-    _add_time_options(export)
+    _add_time_options(export, warp=False)
     export.set_defaults(handler=_cmd_export)
 
     web = commands.add_parser("web", help="launch the interactive browser-based Web UI")

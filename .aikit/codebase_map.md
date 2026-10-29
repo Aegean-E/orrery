@@ -9,8 +9,8 @@
 - **Total Python Modules**: `20`
 - **Total Classes**: `31`
 - **Total Top-Level Functions**: `76`
-- **Total Class Methods**: `209`
-- **Total Source Lines**: `6064`
+- **Total Class Methods**: `214`
+- **Total Source Lines**: `6122`
 
 ---
 
@@ -33,7 +33,7 @@
 ### [`orrery/cli.py`](orrery/cli.py)
 > *Command-line surface for Orrery.*
 
-**Size**: `1370` lines (`59284` bytes)
+**Size**: `1373` lines (`59422` bytes)
 
 **Classes:**
 - `class CliError` - *A failure with a cause and a concrete next action.*
@@ -77,7 +77,7 @@
 - `def _cmd_export(args)`
 - `def _add_view_options(parser, *, trails)`
 - `def _add_physics_options(parser)`
-- `def _add_time_options(parser)`
+- `def _add_time_options(parser, *, warp)`
 - `def _cmd_web(args)`
 - `def build_parser()`
 - `def main(argv)`
@@ -161,7 +161,7 @@
 ### [`orrery/sim.py`](orrery/sim.py)
 > *Gravity, bodies and a symplectic leapfrog integrator.*
 
-**Size**: `417` lines (`17136` bytes)
+**Size**: `426` lines (`17511` bytes)
 
 **Classes:**
 - `class Vec2` - *A point or vector in the plane.*
@@ -199,7 +199,7 @@
 
 **Functions:**
 - `def _accelerations(bodies, g, c, k_e)` - *Pairwise Newtonian/Coulomb acceleration on every body, with optional 1PN general relativity.*
-- `def orbital_elements(primary, body, g)` - *Osculating semi-major axis, eccentricity and period of ``body`` around ``primary``.*
+- `def orbital_elements(primary, body, g, k_e)` - *Osculating semi-major axis, eccentricity and period of ``body`` around ``primary``.*
 
 ---
 
@@ -255,7 +255,7 @@
 ---
 
 ### [`tests/test_cli.py`](tests/test_cli.py)
-**Size**: `539` lines (`24904` bytes)
+**Size**: `565` lines (`26174` bytes)
 
 **Classes:**
 - `class ListAndInfoTests`
@@ -264,6 +264,8 @@
   - Method `.test_info_prints_a_table()`
   - Method `.test_info_json_contains_orbital_elements()`
   - Method `.test_equal_mass_system_does_not_invent_orbital_elements()`
+  - Method `.test_info_json_uses_coulomb_for_charged_scenarios()`
+  - Method `.test_info_json_marks_net_repulsion_as_unbound()`
   - Method `.test_usage_error_has_the_same_triad()`
 - `class SnapshotTests`
   - Method `.test_snapshot_at_zero_is_ascii_clean()`
@@ -310,6 +312,7 @@
   - Method `.test_cli_export_metadata_includes_bounce_and_coulomb()`
   - Method `.test_cli_time_options_dt_and_reverse()`
   - Method `.test_cli_time_options_warp()`
+  - Method `.test_snapshot_rejects_time_scale()`
   - Method `.test_cli_invalid_time_args()`
   - Method `.test_run_interactive_time_keys()`
   - Method `.test_cli_web_subcommand_help()`
@@ -428,7 +431,7 @@
 ---
 
 ### [`tests/test_sim.py`](tests/test_sim.py)
-**Size**: `260` lines (`12450` bytes)
+**Size**: `280` lines (`13538` bytes)
 
 **Classes:**
 - `class Vec2Tests`
@@ -441,6 +444,8 @@
   - Method `.test_figure_eight_returns_after_one_period()`
   - Method `.test_parabolic_orbit_has_no_finite_elements()`
   - Method `.test_orbital_elements_describe_a_unit_circle()`
+  - Method `.test_orbital_elements_include_coulomb_attraction()`
+  - Method `.test_orbital_elements_reject_net_repulsion()`
   - Method `.test_relativity_post_newtonian_precession()`
   - Method `.test_resolve_collisions_inelastic_merger()`
   - Method `.test_advance_and_advance_to_with_merge_radius()`

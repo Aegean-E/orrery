@@ -11,7 +11,7 @@
     "orrery/scenarios.py",
     "tests/test_launchers.py"
   ],
-  "ui_checked_at": "2026-10-28",
+  "ui_checked_at": "2026-10-29",
   "ui_source": "detected",
   "topics": [
     "aikit",

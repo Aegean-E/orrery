@@ -222,6 +222,7 @@ orrery/
 ├── CHANGELOG.md              <- Version history and license transition
 ├── ASSETS.md                 <- Asset/data manifest: what the license covers
 ├── README.md
+├── assets/
 ├── COMMERCIAL.md
 ├── examples/
 │   └── custom-two-body.json  <- editable example scenario

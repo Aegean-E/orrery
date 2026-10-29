@@ -63,6 +63,24 @@ class ListAndInfoTests(unittest.TestCase):
         self.assertFalse(payload["dominant_primary"])
         self.assertTrue(all(body["semi_major_axis"] is None for body in payload["bodies"]))
 
+    def test_info_json_uses_coulomb_for_charged_scenarios(self):
+        code, output = run_cli("info", "bohr", "--json")
+        self.assertEqual(code, 0)
+        payload = json.loads(output)
+        electron = next(body for body in payload["bodies"] if body["name"] == "Electron-1")
+        self.assertAlmostEqual(electron["semi_major_axis"], 0.792, delta=0.01)
+        self.assertLess(electron["eccentricity"], 0.05)
+        self.assertIsNotNone(electron["period"])
+
+    def test_info_json_marks_net_repulsion_as_unbound(self):
+        code, output = run_cli("info", "rutherford", "--json")
+        self.assertEqual(code, 0)
+        payload = json.loads(output)
+        alpha = next(body for body in payload["bodies"] if body["name"] == "Alpha-1")
+        self.assertIsNone(alpha["semi_major_axis"])
+        self.assertIsNone(alpha["eccentricity"])
+        self.assertIsNone(alpha["period"])
+
     def test_usage_error_has_the_same_triad(self):
         stderr = io.StringIO()
         with self.assertRaises(SystemExit) as caught:
@@ -495,17 +513,25 @@ class InteractiveAndTelemetryTests(unittest.TestCase):
         self.assertIn("ORRERY |", output)
 
     def test_cli_time_options_warp(self):
-        code, output = run_cli("snapshot", "solar", "--warp", "2.5",
+        code, output = run_cli("run", "solar", "--warp", "2.5", "--frames", "1",
                                "--ascii", "--no-color")
         self.assertEqual(code, 0)
         self.assertIn("ORRERY |", output)
+
+    def test_snapshot_rejects_time_scale(self):
+        stderr = io.StringIO()
+        with self.assertRaises(SystemExit) as caught:
+            with contextlib.redirect_stderr(stderr):
+                main(["snapshot", "solar", "--warp", "2.5"])
+        self.assertEqual(2, caught.exception.code)
+        self.assertIn("--warp", stderr.getvalue())
 
     def test_cli_invalid_time_args(self):
         code, output = run_cli("snapshot", "solar", "--dt", "-0.1")
         self.assertEqual(code, 2)
         self.assertIn("--dt", output)
 
-        code, output = run_cli("snapshot", "solar", "--time-scale", "0.0")
+        code, output = run_cli("run", "solar", "--time-scale", "0.0", "--frames", "1")
         self.assertEqual(code, 2)
         self.assertIn("--time-scale", output)
 

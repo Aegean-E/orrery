@@ -89,6 +89,26 @@ class WorldTests(unittest.TestCase):
         self.assertLess(orbit.eccentricity, 1e-6)
         self.assertAlmostEqual(orbit.period, YEAR_DAYS / math.sqrt(1.0 + mass), places=6)
 
+    def test_orbital_elements_include_coulomb_attraction(self):
+        proton = Body("Proton", 100.0, Vec2(), Vec2(), "+", charge=1.0)
+        radius = 0.8
+        mu = 0.0001 * 100.01 + 0.01 * (1.0 / 100.0 + 1.0 / 0.01)
+        electron = Body("Electron", 0.01, Vec2(radius, 0.0),
+                        Vec2(0.0, math.sqrt(mu / radius)), "-", charge=-1.0)
+        orbit = orbital_elements(proton, electron, 0.0001, k_e=0.01)
+        self.assertAlmostEqual(orbit.semi_major, radius, places=6)
+        self.assertLess(orbit.eccentricity, 1e-6)
+        self.assertAlmostEqual(orbit.period,
+                               2.0 * math.pi * math.sqrt(radius ** 3 / mu), places=6)
+
+    def test_orbital_elements_reject_net_repulsion(self):
+        nucleus = Body("Gold", 197.0, Vec2(), Vec2(), "N", charge=79.0)
+        alpha = Body("Alpha", 4.0, Vec2(2.5, 0.0), Vec2(2.0, 0.0), "a", charge=2.0)
+        orbit = orbital_elements(nucleus, alpha, 0.001, k_e=0.1)
+        self.assertIsNone(orbit.semi_major)
+        self.assertIsNone(orbit.eccentricity)
+        self.assertIsNone(orbit.period)
+
     def test_relativity_post_newtonian_precession(self):
         # Primary of mass 1.0, test body with e = 0.5
         sun = Body("Sun", 1.0, Vec2(), Vec2())
